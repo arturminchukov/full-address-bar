@@ -34,6 +34,24 @@ describe('normalizeHost', () => {
   it('rejects input with inner spaces', () => {
     expect(normalizeHost('exa mple.com')).toBeNull();
   });
+
+  it('keeps a bracketed IPv6 literal intact', () => {
+    expect(normalizeHost('[2001:db8::1]')).toBe('[2001:db8::1]');
+    expect(normalizeHost('[::1]')).toBe('[::1]');
+  });
+
+  it('strips scheme, port and path around an IPv6 literal', () => {
+    expect(normalizeHost('http://[2001:db8::1]:8080/path?q=1')).toBe('[2001:db8::1]');
+  });
+
+  it('returns null for a scheme that carries no host', () => {
+    expect(normalizeHost('about:blank')).toBeNull();
+    expect(normalizeHost('mailto:someone@example.com')).toBeNull();
+  });
+
+  it('still reads a bare host:port as a host', () => {
+    expect(normalizeHost('example.com:8080/path')).toBe('example.com');
+  });
 });
 
 describe('isDenied', () => {
@@ -65,5 +83,14 @@ describe('isDenied', () => {
 
   it('ignores unnormalizable entries', () => {
     expect(isDenied('example.com', ['', '  ', 'example.com'])).toBe(true);
+  });
+
+  it('does not confuse distinct IPv6 hosts', () => {
+    expect(isDenied('[2001:db8::1]', ['[2001:db8::9999]'])).toBe(false);
+    expect(isDenied('[::2]', ['[::1]'])).toBe(false);
+  });
+
+  it('matches an IPv6 host against its own entry', () => {
+    expect(isDenied('[2001:db8::1]', ['[2001:db8::1]'])).toBe(true);
   });
 });
