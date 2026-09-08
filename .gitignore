@@ -1,0 +1,11 @@
+node_modules/
+dist-chrome/
+dist-firefox/
+dist-tsc/
+release/
+web-ext-artifacts/
+.yarn/
+*.log
+*.zip
+.DS_Store
+.superpowers/
