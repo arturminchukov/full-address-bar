@@ -114,6 +114,15 @@ describe('renderBar', () => {
     expect(calls.hide).toBe(1);
   });
 
+  it('cancels a pending copy when the bar is closed', () => {
+    const { text, close, calls } = setup();
+    text.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    close.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    vi.advanceTimersByTime(250);
+    expect(calls.hide).toBe(1);
+    expect(calls.copy).toBe(0);
+  });
+
   it('shows a transient hint', () => {
     const { bar } = setup();
     const hint = bar.element.querySelector('.fab-hint') as HTMLElement;

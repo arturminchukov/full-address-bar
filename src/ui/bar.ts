@@ -92,7 +92,13 @@ export function renderBar(callbacks: BarCallbacks): BarHandle {
 
   input.addEventListener('blur', stopEditing);
 
-  close.addEventListener('click', () => callbacks.onHide());
+  close.addEventListener('click', () => {
+    // Dismissing the bar cancels anything it still had scheduled: a pending
+    // copy must not reach the clipboard after the user closed the bar.
+    clearTimeout(clickTimer);
+    clearTimeout(hintTimer);
+    callbacks.onHide();
+  });
 
   return {
     element: bar,
