@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodePercent, formatUrl } from './url-format';
+import { decodePercent, formatUrl, toNavigableUrl } from './url-format';
 
 describe('decodePercent', () => {
   it('decodes a percent-encoded UTF-8 run', () => {
@@ -50,5 +50,30 @@ describe('formatUrl', () => {
 
   it('handles the empty string', () => {
     expect(formatUrl('')).toEqual({ raw: '', display: '' });
+  });
+});
+
+describe('toNavigableUrl', () => {
+  it('keeps an absolute URL', () => {
+    expect(toNavigableUrl('https://example.com/a?q=1')).toBe('https://example.com/a?q=1');
+  });
+
+  it('assumes https for a bare host', () => {
+    expect(toNavigableUrl('example.com')).toBe('https://example.com/');
+  });
+
+  it('treats a bare host:port as a host, not a scheme', () => {
+    expect(toNavigableUrl('localhost:3000')).toBe('https://localhost:3000/');
+    expect(toNavigableUrl('127.0.0.1:8080')).toBe('https://127.0.0.1:8080/');
+  });
+
+  it('refuses schemes that are not navigations', () => {
+    expect(toNavigableUrl('javascript:alert(1)')).toBeNull();
+    expect(toNavigableUrl('data:text/html,<b>x</b>')).toBeNull();
+  });
+
+  it('refuses a value that is not a URL', () => {
+    expect(toNavigableUrl('?q=1')).toBeNull();
+    expect(toNavigableUrl('   ')).toBeNull();
   });
 });

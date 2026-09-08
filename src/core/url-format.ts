@@ -35,3 +35,26 @@ export function formatUrl(raw: string): UrlDisplay {
   if (raw.length > MAX_DECODE_LENGTH) return { raw, display: raw };
   return { raw, display: decodePercent(raw) };
 }
+
+// A scheme already present on a typed value. The lookahead keeps a bare
+// "localhost:3000" out of this branch: what follows a port is only digits.
+const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:(?!\d+(?:[/?#]|$))/i;
+
+// Schemes the bar refuses to navigate to. Typing one into an address field is
+// never a navigation, and `javascript:` would execute in the page's context.
+const BLOCKED_SCHEMES = /^(?:javascript|data|vbscript):/i;
+
+/**
+ * Turn a value typed into the bar into a URL worth navigating to, or null
+ * when it is not one. A value with no scheme is assumed to be https.
+ */
+export function toNavigableUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed || BLOCKED_SCHEMES.test(trimmed)) return null;
+  const candidate = HAS_SCHEME.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    return new URL(candidate).href;
+  } catch {
+    return null;
+  }
+}
