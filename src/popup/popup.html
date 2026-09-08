@@ -2,9 +2,110 @@
 <html>
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Full Address Bar</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --text: #1f2328;
+        --muted: #656d76;
+        --accent: #1f6feb;
+        --border: #d0d7de;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0d1117;
+          --text: #e6edf3;
+          --muted: #8b949e;
+          --accent: #388bfd;
+          --border: #30363d;
+        }
+      }
+      body {
+        margin: 0;
+        width: 300px;
+        padding: 14px 16px;
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      }
+      h1 { font-size: 14px; margin: 0 0 10px; }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      select {
+        padding: 4px 6px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text);
+        font: inherit;
+      }
+      button {
+        padding: 8px 12px;
+        font: inherit;
+        font-weight: 600;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      button[hidden] { display: none; }
+      #toggle {
+        width: 100%;
+        color: #fff;
+        background: var(--accent);
+        border: none;
+      }
+      #toggle[data-on="true"] {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      #deny-site {
+        width: 100%;
+        color: var(--accent);
+        background: transparent;
+        border: 1px solid var(--border);
+      }
+      h2 { font-size: 12px; margin: 14px 0 6px; color: var(--muted); font-weight: 600; }
+      #denied { list-style: none; margin: 0; padding: 0; }
+      #denied li {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 4px 0;
+        border-top: 1px solid var(--border);
+      }
+      #denied button {
+        padding: 0 6px;
+        color: var(--muted);
+        background: transparent;
+        border: none;
+        font-weight: 400;
+      }
+      #empty { margin: 0; color: var(--muted); font-size: 12px; }
+    </style>
   </head>
   <body>
+    <h1>Full Address Bar</h1>
+    <button id="toggle" type="button">…</button>
+    <div class="row" style="margin-top: 10px">
+      <label for="theme">Theme</label>
+      <select id="theme">
+        <option value="auto">Auto</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </div>
+    <button id="deny-site" type="button" hidden>…</button>
+    <h2>Disabled on</h2>
+    <p id="empty">No sites yet.</p>
+    <ul id="denied"></ul>
     <script src="popup.js"></script>
   </body>
 </html>
