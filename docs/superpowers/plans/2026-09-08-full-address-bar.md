@@ -979,6 +979,15 @@ describe('renderBar', () => {
     expect(calls.hide).toBe(1);
   });
 
+  it('cancels a pending copy when the bar is closed', () => {
+    const { text, close, calls } = setup();
+    text.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    close.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    vi.advanceTimersByTime(250);
+    expect(calls.hide).toBe(1);
+    expect(calls.copy).toBe(0);
+  });
+
   it('shows a transient hint', () => {
     const { bar } = setup();
     const hint = bar.element.querySelector('.fab-hint') as HTMLElement;
@@ -1185,7 +1194,13 @@ export function renderBar(callbacks: BarCallbacks): BarHandle {
 
   input.addEventListener('blur', stopEditing);
 
-  close.addEventListener('click', () => callbacks.onHide());
+  close.addEventListener('click', () => {
+    // Dismissing the bar cancels anything it still had scheduled: a pending
+    // copy must not reach the clipboard after the user closed the bar.
+    clearTimeout(clickTimer);
+    clearTimeout(hintTimer);
+    callbacks.onHide();
+  });
 
   return {
     element: bar,
