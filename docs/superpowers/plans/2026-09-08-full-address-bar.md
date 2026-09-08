@@ -697,6 +697,24 @@ describe('normalizeHost', () => {
   it('rejects input with inner spaces', () => {
     expect(normalizeHost('exa mple.com')).toBeNull();
   });
+
+  it('keeps a bracketed IPv6 literal intact', () => {
+    expect(normalizeHost('[2001:db8::1]')).toBe('[2001:db8::1]');
+    expect(normalizeHost('[::1]')).toBe('[::1]');
+  });
+
+  it('strips scheme, port and path around an IPv6 literal', () => {
+    expect(normalizeHost('http://[2001:db8::1]:8080/path?q=1')).toBe('[2001:db8::1]');
+  });
+
+  it('returns null for a scheme that carries no host', () => {
+    expect(normalizeHost('about:blank')).toBeNull();
+    expect(normalizeHost('mailto:someone@example.com')).toBeNull();
+  });
+
+  it('still reads a bare host:port as a host', () => {
+    expect(normalizeHost('example.com:8080/path')).toBe('example.com');
+  });
 });
 
 describe('isDenied', () => {
@@ -729,6 +747,15 @@ describe('isDenied', () => {
   it('ignores unnormalizable entries', () => {
     expect(isDenied('example.com', ['', '  ', 'example.com'])).toBe(true);
   });
+
+  it('does not confuse distinct IPv6 hosts', () => {
+    expect(isDenied('[2001:db8::1]', ['[2001:db8::9999]'])).toBe(false);
+    expect(isDenied('[::2]', ['[::1]'])).toBe(false);
+  });
+
+  it('matches an IPv6 host against its own entry', () => {
+    expect(isDenied('[2001:db8::1]', ['[2001:db8::1]'])).toBe(true);
+  });
 });
 ```
 
@@ -750,18 +777,28 @@ Expected: FAIL — cannot resolve `./site-rules`.
  * Reduce user input (a bare host, a pasted URL, stray whitespace) to a
  * storable hostname, or null when it cannot be one.
  */
+// A scheme with no "//" (about:blank, mailto:) carries no host at all. The
+// lookahead keeps "localhost:3000" out of this branch: a bare port is digits.
+const SCHEME_WITHOUT_AUTHORITY = /^[a-z][a-z0-9+.-]*:(?!\d+(?:[/?#]|$))/;
+// A bracketed IPv6 literal, which is what location.hostname reports for one.
+const IPV6_LITERAL = /^\[[0-9a-f:.]+\]/;
+
 export function normalizeHost(input: string): string | null {
   let value = input.trim().toLowerCase();
   if (!value) return null;
 
   const schemeEnd = value.indexOf('://');
   if (schemeEnd !== -1) value = value.slice(schemeEnd + 3);
+  else if (SCHEME_WITHOUT_AUTHORITY.test(value)) return null;
 
   // Everything from the first path, query or fragment separator is not host.
   value = value.split(/[/?#]/, 1)[0];
-  // Credentials, then port.
-  value = value.slice(value.lastIndexOf('@') + 1).split(':', 1)[0];
-  value = value.replace(/^\.+/, '').replace(/\.+$/, '');
+  // Credentials, then port — but an IPv6 literal is colons all the way down,
+  // so it keeps its brackets and only a trailing :port is cut.
+  value = value.slice(value.lastIndexOf('@') + 1);
+  const ipv6 = IPV6_LITERAL.exec(value);
+  if (ipv6) value = ipv6[0];
+  else value = value.split(':', 1)[0].replace(/^\.+/, '').replace(/\.+$/, '');
 
   if (!value || /\s/.test(value)) return null;
   return value;
