@@ -1818,6 +1818,10 @@ Deliverable: a working popup with the global toggle, theme selector, "disable on
 **Files:**
 - Modify: `src/popup/popup.html` (replace the Task 1 placeholder)
 - Modify: `src/popup/popup.ts` (replace the Task 1 placeholder)
+- Create (added during execution): `src/popup/deny-list.ts` + `src/popup/deny-list.test.ts` — the
+  deny-list writes, extracted so they can be tested. Each write re-reads settings through
+  `store.load()` first; computing from the snapshot captured at render time meant two rapid
+  removals silently resurrected the first host.
 
 **Interfaces:**
 - Consumes: `createSettingsStore` (Task 7), `normalizeHost` (Task 4), `Theme` (Task 3).
@@ -1952,6 +1956,7 @@ Deliverable: a working popup with the global toggle, theme selector, "disable on
 // on its own, so nothing is messaged directly.
 
 import { normalizeHost } from '../core/site-rules';
+import { addDeniedHost, removeDeniedHost } from './deny-list';
 import type { Settings, Theme } from '../core/settings';
 import { createSettingsStore } from '../integration/settings-storage';
 
@@ -1976,9 +1981,7 @@ function renderDenied(settings: Settings): void {
       remove.textContent = '✕';
       remove.title = `Enable the bar on ${host}`;
       remove.addEventListener('click', () => {
-        void store
-          .save({ deniedHosts: settings.deniedHosts.filter((h) => h !== host) })
-          .then(refresh);
+        void removeDeniedHost(store, host).then(refresh);
       });
 
       const name = document.createElement('span');
@@ -2006,7 +2009,7 @@ async function refresh(): Promise<void> {
   if (host && !alreadyDenied) {
     denySite.textContent = `Disable on ${host}`;
     denySite.onclick = () => {
-      void store.save({ deniedHosts: [...settings.deniedHosts, host] }).then(refresh);
+      void addDeniedHost(store, host).then(refresh);
     };
   }
 }
