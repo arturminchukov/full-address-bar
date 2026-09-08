@@ -23,8 +23,11 @@ const excludes = [
   'dist-firefox/*',
   'dist-tsc/*',
   'release/*',
+  'web-ext-artifacts/*',
   '.yarn/*',
   '.git/*',
+  '.superpowers/*',
+  '*.log',
   '*.zip',
   '**/.DS_Store',
 ];
