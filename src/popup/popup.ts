@@ -20,6 +20,22 @@ async function currentHost(): Promise<string | null> {
   return tab?.url ? normalizeHost(tab.url) : null;
 }
 
+// Every deny-list write re-reads the stored value first: the popup can issue a
+// second write before the previous refresh lands, and computing from a stale
+// snapshot would silently undo it.
+async function removeDeniedHost(host: string): Promise<void> {
+  const current = await store.load();
+  await store.save({ deniedHosts: current.deniedHosts.filter((h) => h !== host) });
+  await refresh();
+}
+
+async function addDeniedHost(host: string): Promise<void> {
+  const current = await store.load();
+  if (current.deniedHosts.includes(host)) return;
+  await store.save({ deniedHosts: [...current.deniedHosts, host] });
+  await refresh();
+}
+
 function renderDenied(settings: Settings): void {
   deniedList.replaceChildren(
     ...settings.deniedHosts.map((host) => {
@@ -28,9 +44,7 @@ function renderDenied(settings: Settings): void {
       remove.textContent = '✕';
       remove.title = `Enable the bar on ${host}`;
       remove.addEventListener('click', () => {
-        void store
-          .save({ deniedHosts: settings.deniedHosts.filter((h) => h !== host) })
-          .then(refresh);
+        void removeDeniedHost(host);
       });
 
       const name = document.createElement('span');
@@ -58,7 +72,7 @@ async function refresh(): Promise<void> {
   if (host && !alreadyDenied) {
     denySite.textContent = `Disable on ${host}`;
     denySite.onclick = () => {
-      void store.save({ deniedHosts: [...settings.deniedHosts, host] }).then(refresh);
+      void addDeniedHost(host);
     };
   }
 }
