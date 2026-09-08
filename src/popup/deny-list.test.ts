@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSettingsStore } from '../integration/settings-storage';
 
-// Minimal stand-in for chrome.storage.local: enough for the store's get/set.
-function fakeStorage() {
+// Minimal stand-in for chrome.storage: enough for the store's get/set.
+function fakeStorageArea() {
   const data: Record<string, unknown> = {};
   return {
     local: {
@@ -15,7 +15,7 @@ function fakeStorage() {
 }
 
 beforeEach(() => {
-  vi.stubGlobal('chrome', fakeStorage());
+  vi.stubGlobal('chrome', { storage: fakeStorageArea() });
 });
 
 describe('deny-list writes', () => {
