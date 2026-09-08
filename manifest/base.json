@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Full Address Bar",
+  "version": "0.1.0",
+  "description": "Shows the full current URL in a bar at the top of every page. Click to copy, double-click to edit.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": ["storage", "activeTab"],
+  "action": {
+    "default_title": "Full Address Bar",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}

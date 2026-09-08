@@ -1,0 +1,30 @@
+{
+  "name": "full-address-bar",
+  "version": "0.1.0",
+  "description": "Browser extension that shows the full current URL in a bar at the top of every page",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "author": "Artur Minchukou",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "package": "node build.mjs && node scripts/package.mjs",
+    "package:source": "node scripts/package-source.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint \"src/**/*.ts\""
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "@typescript-eslint/eslint-plugin": "^7.16.0",
+    "@typescript-eslint/parser": "^7.16.0",
+    "esbuild": "^0.23.0",
+    "eslint": "^8.57.0",
+    "jsdom": "^29.1.1",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "packageManager": "yarn@4.15.0"
+}
