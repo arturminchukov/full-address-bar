@@ -21,7 +21,13 @@
 - `ui/` must not reference `chrome` or `location`; it receives values and callbacks.
 - The bar copies the **raw** `location.href`, never the decoded display string.
 - TypeScript strict mode; `yarn typecheck`, `yarn lint` and `yarn test` must pass at the end of every task.
-- **Do not run `git commit`.** The repository owner commits manually. Each task ends by staging the files and reporting the suggested commit message.
+- **Commits:** the owner granted per-task commits for this execution run only. Commit with the
+  suggested message at the end of each task, under the repository's own git identity
+  (`Artur Minchukov <arturminchukov@gmail.com>`, already set locally). Never add a
+  `Co-Authored-By` trailer or any "Generated with" line. Never amend or rebase earlier commits.
+- The repository is already initialized, `docs/` is already committed on `main`, and work happens
+  on the branch `feature/full-address-bar`. Do not run `git init` and do not switch branches.
+- `.gitignore` already exists and already ignores `.superpowers/` — keep that entry.
 
 ---
 
