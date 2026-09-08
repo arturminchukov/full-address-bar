@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSettingsStore } from '../integration/settings-storage';
+import { addDeniedHost, removeDeniedHost } from './deny-list';
 
 // Minimal stand-in for chrome.storage: enough for the store's get/set.
 function fakeStorageArea() {
@@ -19,24 +20,31 @@ beforeEach(() => {
 });
 
 describe('deny-list writes', () => {
-  it('keeps both hosts when two removals are computed from fresh state', async () => {
+  it('removes each host when removals are applied in turn', async () => {
     const store = createSettingsStore();
     await store.save({ deniedHosts: ['a.com', 'b.com', 'c.com'] });
 
-    // What the popup does: re-read, then write, for each removal in turn.
-    for (const host of ['a.com', 'b.com']) {
-      const current = await store.load();
-      await store.save({ deniedHosts: current.deniedHosts.filter((h) => h !== host) });
-    }
+    await removeDeniedHost(store, 'a.com');
+    await removeDeniedHost(store, 'b.com');
 
     expect((await store.load()).deniedHosts).toEqual(['c.com']);
+  });
+
+  it('adds a host without duplicating one already listed', async () => {
+    const store = createSettingsStore();
+    await store.save({ deniedHosts: ['a.com'] });
+
+    await addDeniedHost(store, 'b.com');
+    await addDeniedHost(store, 'a.com');
+
+    expect((await store.load()).deniedHosts).toEqual(['a.com', 'b.com']);
   });
 
   it('loses a removal when both writes start from the same snapshot', async () => {
     const store = createSettingsStore();
     await store.save({ deniedHosts: ['a.com', 'b.com', 'c.com'] });
 
-    // The old behavior, kept as an executable record of what the fix prevents.
+    // The old behavior, kept as an executable record of what the helpers prevent.
     const stale = await store.load();
     await store.save({ deniedHosts: stale.deniedHosts.filter((h) => h !== 'a.com') });
     await store.save({ deniedHosts: stale.deniedHosts.filter((h) => h !== 'b.com') });
