@@ -15,8 +15,25 @@ describe('parseSettings', () => {
     expect(parseSettings({ enabled: false })).toEqual({
       enabled: false,
       theme: 'auto',
+      position: 'top',
+      autoHide: false,
       deniedHosts: [],
     });
+  });
+
+  it('accepts both positions', () => {
+    expect(parseSettings({ position: 'bottom' }).position).toBe('bottom');
+    expect(parseSettings({ position: 'top' }).position).toBe('top');
+  });
+
+  it('rejects an unknown position', () => {
+    expect(parseSettings({ position: 'left' }).position).toBe('top');
+    expect(parseSettings({ position: 1 }).position).toBe('top');
+  });
+
+  it('reads the auto-hide flag and rejects a wrongly typed one', () => {
+    expect(parseSettings({ autoHide: true }).autoHide).toBe(true);
+    expect(parseSettings({ autoHide: 'yes' }).autoHide).toBe(false);
   });
 
   it('rejects a wrongly typed enabled flag', () => {

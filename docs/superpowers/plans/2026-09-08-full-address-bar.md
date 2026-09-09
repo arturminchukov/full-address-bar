@@ -48,7 +48,7 @@ Deliverable: `yarn build` produces loadable `dist-chrome/` and `dist-firefox/` c
 - [ ] **Step 1: Initialize the repository and package manifest**
 
 ```bash
-cd /Users/arturminchukov/code/personal/url-view
+cd /Users/arturminchukov/code/personal/full-address-bar
 git init
 corepack enable
 ```

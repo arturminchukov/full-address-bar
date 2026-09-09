@@ -1,0 +1,118 @@
+<!doctype html>
+<!--
+  Branding tiles for the Chrome Web Store, built as exact-size pages and then
+  screenshotted. Edit this file, never the PNGs.
+
+    agent-browser set viewport 440 280
+    agent-browser open "file://$PWD/docs/store-assets/make-tiles.html?tile=small"
+    agent-browser screenshot docs/store-assets/promo-small-tile-440x280.png
+
+    agent-browser set viewport 1400 560
+    agent-browser open "file://$PWD/docs/store-assets/make-tiles.html?tile=marquee"
+    agent-browser screenshot docs/store-assets/promo-marquee-1400x560.png
+
+  Colors are the bar's own dark-theme tokens from src/ui/styles.ts.
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Full Address Bar — promo tiles</title>
+    <style>
+      :root {
+        --bg: #0d1117;
+        --bg-elev: #161b22;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --accent: #58a6ff;
+        --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-ui);
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background:
+          radial-gradient(120% 140% at 12% 0%, #1b2430 0%, var(--bg) 62%);
+      }
+
+      .tile { display: flex; align-items: center; }
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-family: var(--font-mono);
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      .bar .scheme { color: var(--muted); }
+      .bar .host { color: var(--text); }
+      .bar .rest { color: var(--accent); }
+      .bar .dot {
+        flex: none;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+
+      /* ---- small tile: 440x280 ---- */
+      body.small .tile { flex-direction: column; gap: 18px; text-align: center; padding: 0 28px; }
+      body.small img { width: 72px; height: 72px; }
+      body.small h1 { margin: 0; font-size: 27px; letter-spacing: -0.4px; }
+      body.small p { margin: 0; font-size: 14px; color: var(--muted); }
+      body.small .bar { width: 100%; padding: 7px 10px; font-size: 11px; }
+      body.small .bar .dot { width: 6px; height: 6px; }
+
+      /* ---- marquee: 1400x560 ---- */
+      body.marquee .tile { gap: 56px; padding: 0 88px; }
+      body.marquee img { width: 168px; height: 168px; flex: none; }
+      body.marquee .copy { display: flex; flex-direction: column; gap: 22px; }
+      body.marquee h1 { margin: 0; font-size: 68px; letter-spacing: -1.6px; }
+      body.marquee p { margin: 0; font-size: 27px; color: var(--muted); line-height: 1.35; }
+      body.marquee .bar { padding: 15px 20px; font-size: 21px; margin-top: 6px; }
+      body.marquee .bar .dot { width: 11px; height: 11px; }
+    </style>
+  </head>
+  <body>
+    <div class="tile">
+      <img src="../../icons/icon-128.png" alt="" />
+      <div class="copy">
+        <h1>Full Address Bar</h1>
+        <p class="tagline"></p>
+        <div class="bar">
+          <span class="dot"></span>
+          <span><span class="scheme">https://</span><span class="host">ru.wikipedia.org</span><span class="rest">/wiki/Всемирная_паутина</span></span>
+        </div>
+      </div>
+    </div>
+    <script>
+      const tile = new URLSearchParams(location.search).get('tile') === 'marquee' ? 'marquee' : 'small';
+      document.body.className = tile;
+      document.querySelector('.tagline').textContent =
+        tile === 'marquee'
+          ? 'The whole URL, on every page — readable, copyable, editable.'
+          : 'The whole URL, on every page.';
+      // The small tile has no room for a wrapper element around the copy.
+      if (tile === 'small') {
+        const tileEl = document.querySelector('.tile');
+        const copy = document.querySelector('.copy');
+        while (copy.firstChild) tileEl.appendChild(copy.firstChild);
+        copy.remove();
+      }
+    </script>
+  </body>
+</html>

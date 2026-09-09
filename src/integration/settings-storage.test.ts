@@ -73,11 +73,15 @@ describe('createSettingsStore', () => {
     expect(storage.data[key]).toEqual({
       enabled: false,
       theme: 'dark',
+      position: 'top',
+      autoHide: false,
       deniedHosts: ['a.com'],
     });
     expect(await store.load()).toEqual({
       enabled: false,
       theme: 'dark',
+      position: 'top',
+      autoHide: false,
       deniedHosts: ['a.com'],
     });
   });

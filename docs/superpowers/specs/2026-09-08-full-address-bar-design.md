@@ -11,7 +11,7 @@ hide the address (scheme, `www.`, query, long paths); this extension makes the
 complete address permanently visible, readable, copyable and editable.
 
 Naming: product name **Full Address Bar**, package/slug `full-address-bar`,
-repository directory `url-view`.
+repository directory `full-address-bar`.
 
 Architecture follows the sibling project `../git-path-viewer`: esbuild bundling
 into `dist-chrome/` and `dist-firefox/`, a shared manifest base with
@@ -56,6 +56,23 @@ the bar is always visible.
 
 The strategy is isolated in `content/page-shift.ts` (apply + revert), so it can
 be replaced without touching the rest of the code.
+
+### Revealing an auto-hidden bar
+
+The pointer-driven reveal is measured from pointer coordinates, not by placing
+a strip at the edge of the viewport.
+
+Rationale: a strip is a hit area, and it would sit exactly where sites put
+their own edge-anchored buttons, swallowing clicks meant for them. Listening
+for `mousemove` and comparing against the viewport edge costs the page nothing
+and leaves those elements clickable. A hidden bar also carries
+`pointer-events: none`, so it cannot intercept anything while slid away.
+
+The decision logic lives in `core/reveal-policy.ts` as pure functions
+(`pointerAtEdge`, `scrollIntent`); `content/edge-reveal.ts` holds the
+listeners. The awkward rules — scroll noise, the grace period before
+re-hiding, which edge counts — are then testable against a table of numbers
+rather than a live page.
 
 ### URL change detection
 
@@ -149,7 +166,7 @@ src/
 | Enter (edit mode) | Navigate to the entered value |
 | Esc (edit mode) | Revert to display mode with the current URL |
 | Blur (edit mode) | Same as Esc |
-| Close button | Hide the bar and revert the page shift for this page load |
+| `⋯` menu | Position, auto-hide, hide for this page load, turn off on this site |
 
 Edit mode navigates to the entered value as typed, with one normalization: if
 it has no scheme, `https://` is prepended. No search fallback, no history
@@ -161,9 +178,15 @@ lookup.
 interface Settings {
   enabled: boolean;          // global on/off, default true
   theme: 'light' | 'dark' | 'auto';  // default 'auto'
+  position: 'top' | 'bottom';        // default 'top'
+  autoHide: boolean;         // hide while scrolling, default false
   deniedHosts: string[];     // default []
 }
 ```
+
+`autoHide` implies the bar floats over the page instead of pushing it: a bar
+that both moved the page and slid away on scroll would make the content jump
+on every scroll, so the two are one setting rather than two.
 
 Stored in `chrome.storage.local` under a single key. Reads are validated
 through `core/settings.ts`, which falls back to defaults for anything missing
