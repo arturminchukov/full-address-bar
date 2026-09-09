@@ -2,9 +2,8 @@
 // subdomain of it; the list is empty by default, so the bar is shown
 // everywhere until the user opts a site out.
 
-// A scheme with no "//" (about:blank, mailto:) carries no host at all. The
-// lookahead keeps "localhost:3000" out of this branch: a bare port is digits.
-const SCHEME_WITHOUT_AUTHORITY = /^[a-z][a-z0-9+.-]*:(?!\d+(?:[/?#]|$))/;
+import { hasScheme } from './url-format';
+
 // A bracketed IPv6 literal, which is what location.hostname reports for one.
 const IPV6_LITERAL = /^\[[0-9a-f:.]+\]/;
 
@@ -18,7 +17,8 @@ export function normalizeHost(input: string): string | null {
 
   const schemeEnd = value.indexOf('://');
   if (schemeEnd !== -1) value = value.slice(schemeEnd + 3);
-  else if (SCHEME_WITHOUT_AUTHORITY.test(value)) return null;
+  // A scheme with no "//" (about:blank, mailto:) carries no host at all.
+  else if (hasScheme(value)) return null;
 
   // Everything from the first path, query or fragment separator is not host.
   value = value.split(/[/?#]/, 1)[0];

@@ -12,8 +12,11 @@ export interface UrlDisplay {
 // Above this length decoding costs more than it helps (long data: URLs).
 const MAX_DECODE_LENGTH = 4096;
 
-// One or more consecutive %XX escapes: a full UTF-8 code point never spans
-// two separate runs, so decoding run by run is safe.
+// One or more consecutive %XX escapes. A run is the safe unit to decode: a
+// single UTF-8 code point is always written as consecutive escapes, so it can
+// never straddle two runs. The cost is deliberate: one invalid byte anywhere
+// in a run makes `decodeURIComponent` throw for the whole run, so that entire
+// run stays percent-encoded rather than being partially decoded.
 const PERCENT_RUN = /(?:%[0-9A-Fa-f]{2})+/g;
 
 /**
@@ -31,18 +34,39 @@ export function decodePercent(value: string): string {
   });
 }
 
-export function formatUrl(raw: string): UrlDisplay {
-  if (raw.length > MAX_DECODE_LENGTH) return { raw, display: raw };
-  return { raw, display: decodePercent(raw) };
+// Characters that must never reach the display: C0/C1 controls, zero-width
+// and bidi marks. A decoded U+202E would render the rest of the address
+// reversed, which is exactly the spoofing the bar is supposed to prevent.
+const UNSAFE_DISPLAY =
+  // eslint-disable-next-line no-control-regex -- matching control chars is the point
+  /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g;
+
+function keepDisplaySafe(value: string): string {
+  return value.replace(UNSAFE_DISPLAY, (char) => encodeURIComponent(char));
 }
 
-// A scheme already present on a typed value. The lookahead keeps a bare
+export function formatUrl(raw: string): UrlDisplay {
+  if (raw.length > MAX_DECODE_LENGTH) return { raw, display: keepDisplaySafe(raw) };
+  return { raw, display: keepDisplaySafe(decodePercent(raw)) };
+}
+
+// A scheme already present on a value. The lookahead keeps a bare
 // "localhost:3000" out of this branch: what follows a port is only digits.
 const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:(?!\d+(?:[/?#]|$))/i;
+
+/** True when the value starts with a real URL scheme rather than a host:port. */
+export function hasScheme(value: string): boolean {
+  return HAS_SCHEME.test(value);
+}
 
 // Schemes the bar refuses to navigate to. Typing one into an address field is
 // never a navigation, and `javascript:` would execute in the page's context.
 const BLOCKED_SCHEMES = /^(?:javascript|data|vbscript):/i;
+
+// Schemes worth navigating to. `new URL` accepts any unknown scheme, so
+// without this allowlist "localhost:abc" parses and then navigates nowhere,
+// with no feedback at all.
+const NAVIGABLE_PROTOCOLS = new Set(['http:', 'https:', 'file:', 'ftp:', 'mailto:']);
 
 /**
  * Turn a value typed into the bar into a URL worth navigating to, or null
@@ -51,9 +75,10 @@ const BLOCKED_SCHEMES = /^(?:javascript|data|vbscript):/i;
 export function toNavigableUrl(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed || BLOCKED_SCHEMES.test(trimmed)) return null;
-  const candidate = HAS_SCHEME.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const candidate = hasScheme(trimmed) ? trimmed : `https://${trimmed}`;
   try {
-    return new URL(candidate).href;
+    const url = new URL(candidate);
+    return NAVIGABLE_PROTOCOLS.has(url.protocol) ? url.href : null;
   } catch {
     return null;
   }
