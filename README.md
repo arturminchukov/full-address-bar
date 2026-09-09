@@ -50,8 +50,8 @@ instead of below it.
 
 ## Permissions
 
-The extension requests `storage`, `activeTab`, and a content script that runs
-on every page (`<all_urls>`). There is no background script. Chrome shows
+The extension requests `storage`, `activeTab`, `clipboardWrite`, and a content
+script that runs on every page (`<all_urls>`). There is no background script. Chrome shows
 this combination as "read and change all your data on all websites" — that
 warning is simply what a bar meant to appear on every page requires; see
 [PRIVACY.md](PRIVACY.md) for exactly what the extension does and does not do
