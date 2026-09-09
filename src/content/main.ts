@@ -29,13 +29,37 @@ function currentUrl(): void {
   bar.setUrl(display, raw);
 }
 
-async function copyUrl(): Promise<void> {
+// `navigator.clipboard` only exists in a secure context, so on every plain
+// http:// page the primary interaction would fail without this fallback.
+function copyWithExecCommand(value: string): boolean {
+  const field = document.createElement('textarea');
+  field.value = value;
+  field.setAttribute('readonly', '');
+  field.style.setProperty('position', 'fixed', 'important');
+  field.style.setProperty('top', '-1000px', 'important');
+  field.style.setProperty('opacity', '0', 'important');
+  document.body?.append(field);
   try {
-    await navigator.clipboard.writeText(location.href);
-    bar?.showHint('Copied');
+    field.select();
+    return document.execCommand('copy');
   } catch {
-    bar?.showHint('Copy failed');
+    return false;
+  } finally {
+    field.remove();
   }
+}
+
+async function copyUrl(): Promise<void> {
+  const value = location.href;
+  try {
+    if (!navigator.clipboard) throw new Error('no clipboard API');
+    await navigator.clipboard.writeText(value);
+    bar?.showHint('Copied');
+    return;
+  } catch {
+    // Fall through to the legacy path below.
+  }
+  bar?.showHint(copyWithExecCommand(value) ? 'Copied' : 'Copy failed');
 }
 
 function navigate(value: string): void {
@@ -62,6 +86,9 @@ function mount(settings: Settings): void {
 
   const element = document.createElement('div');
   element.id = HOST_ID;
+  // A page rule setting transform/filter/contain/will-change on divs would
+  // make this host a containing block and break the bar's position: fixed.
+  element.style.setProperty('all', 'initial', 'important');
   const shadow = element.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = STYLES;
@@ -112,9 +139,16 @@ function sync(settings: Settings): void {
 
 async function run(): Promise<void> {
   // Subscribe before the first mount: if that mount fails, a later settings
-  // change must still be able to bring the bar back.
-  store.subscribe(sync);
-  sync(await store.load());
+  // change must still be able to bring the bar back. Anything the
+  // subscription delivers while the initial load is still in flight is newer
+  // than that load, so it wins.
+  let newest: Settings | null = null;
+  store.subscribe((settings) => {
+    newest = settings;
+    sync(settings);
+  });
+  const initial = await store.load();
+  sync(newest ?? initial);
 }
 
 void run();

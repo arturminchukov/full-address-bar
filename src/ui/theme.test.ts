@@ -7,10 +7,9 @@ afterEach(() => {
 });
 
 function stubPrefersDark(matches: boolean) {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => ({ matches })),
-  );
+  const query = vi.fn(() => ({ matches }));
+  vi.stubGlobal('matchMedia', query);
+  return query;
 }
 
 describe('resolveTheme', () => {
@@ -21,10 +20,14 @@ describe('resolveTheme', () => {
   });
 
   it('follows the OS preference for auto', () => {
-    stubPrefersDark(true);
+    const dark = stubPrefersDark(true);
     expect(resolveTheme('auto')).toBe('dark');
-    stubPrefersDark(false);
+    // The stub ignores its argument, so assert the query we actually asked for.
+    expect(dark).toHaveBeenCalledWith('(prefers-color-scheme: dark)');
+
+    const light = stubPrefersDark(false);
     expect(resolveTheme('auto')).toBe('light');
+    expect(light).toHaveBeenCalledWith('(prefers-color-scheme: dark)');
   });
 
   it('falls back to light when matchMedia is unavailable', () => {

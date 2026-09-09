@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderBar, type BarCallbacks } from './bar';
+import { BAR_HEIGHT, renderBar, type BarCallbacks } from './bar';
+import { STYLES } from './styles';
 
 function setup(overrides: Partial<BarCallbacks> = {}) {
   const calls = { copy: 0, navigate: [] as string[], hide: 0 };
@@ -32,6 +33,14 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   document.body.replaceChildren();
+});
+
+describe('BAR_HEIGHT', () => {
+  // Nothing else ties the constant to the CSS, and a divergence means the bar
+  // covers content or leaves a gap on every page.
+  it('matches the height the stylesheet renders', () => {
+    expect(STYLES).toContain(`height: ${BAR_HEIGHT}px`);
+  });
 });
 
 describe('renderBar', () => {
@@ -131,6 +140,11 @@ describe('renderBar', () => {
     expect(hint.hidden).toBe(false);
     vi.advanceTimersByTime(1500);
     expect(hint.hidden).toBe(true);
+  });
+
+  it('puts the full address in the tooltip, with the interaction hint', () => {
+    const { text } = setup();
+    expect(text.title).toBe('https://example.com/путь\nClick to copy · double-click to edit');
   });
 
   it('applies the theme as a data attribute', () => {

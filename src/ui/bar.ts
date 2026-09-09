@@ -12,6 +12,10 @@ export const BAR_HEIGHT = 28;
 const CLICK_DELAY_MS = 250;
 const HINT_MS = 1500;
 
+// The bar ellipsises a long URL, so the full address lives in the tooltip —
+// with the interaction hint appended, since the title can only be one string.
+const INTERACTION_HINT = 'Click to copy · double-click to edit';
+
 export interface BarCallbacks {
   onCopy(): void;
   onNavigate(value: string): void;
@@ -27,10 +31,7 @@ export interface BarHandle {
 }
 
 export function renderBar(callbacks: BarCallbacks): BarHandle {
-  const text = el('span', {
-    class: 'fab-url',
-    title: 'Click to copy · double-click to edit',
-  });
+  const text = el('span', { class: 'fab-url' });
   const input = el('input', {
     class: 'fab-input',
     type: 'text',
@@ -105,6 +106,7 @@ export function renderBar(callbacks: BarCallbacks): BarHandle {
     setUrl(display, rawUrl) {
       raw = rawUrl;
       text.textContent = display;
+      text.title = `${display}\n${INTERACTION_HINT}`;
       // Never clobber a half-typed address under the user's cursor.
       if (!editing) input.value = rawUrl;
     },
