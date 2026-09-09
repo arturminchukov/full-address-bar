@@ -200,9 +200,12 @@ both browsers loaded unpacked.
 
 Manifest V3.
 
-- `permissions: ["storage", "activeTab"]` — `activeTab` lets the popup read the
-  current tab's host for the "disable on this site" action, granted only while
-  the user has the popup open. No standing `host_permissions`, no `tabs`.
+- `permissions: ["storage", "activeTab", "clipboardWrite"]` — `activeTab` lets
+  the popup read the current tab's host for the "disable on this site" action,
+  granted only while the user has the popup open. `clipboardWrite` covers the
+  `document.execCommand('copy')` fallback used where `navigator.clipboard` is
+  unavailable (insecure contexts); it adds no user-facing warning. No standing
+  `host_permissions`, no `tabs`.
 - `content_scripts`: `matches: ["<all_urls>"]`, `run_at: "document_start"`,
   `all_frames: false`
 - `action` with `default_popup: popup.html`

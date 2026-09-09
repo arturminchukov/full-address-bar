@@ -21,7 +21,13 @@
 - `ui/` must not reference `chrome` or `location`; it receives values and callbacks.
 - The bar copies the **raw** `location.href`, never the decoded display string.
 - TypeScript strict mode; `yarn typecheck`, `yarn lint` and `yarn test` must pass at the end of every task.
-- **Do not run `git commit`.** The repository owner commits manually. Each task ends by staging the files and reporting the suggested commit message.
+- **Commits:** the owner granted per-task commits for this execution run only. Commit with the
+  suggested message at the end of each task, under the repository's own git identity
+  (`Artur Minchukov <arturminchukov@gmail.com>`, already set locally). Never add a
+  `Co-Authored-By` trailer or any "Generated with" line. Never amend or rebase earlier commits.
+- The repository is already initialized, `docs/` is already committed on `main`, and work happens
+  on the branch `feature/full-address-bar`. Do not run `git init` and do not switch branches.
+- `.gitignore` already exists and already ignores `.superpowers/` — keep that entry.
 
 ---
 
@@ -372,6 +378,7 @@ Deliverable: a pure function that turns a raw URL into the display string, decod
 **Interfaces:**
 - Consumes: nothing.
 - Produces: `formatUrl(raw: string): UrlDisplay` where `interface UrlDisplay { raw: string; display: string }`, and `decodePercent(value: string): string`.
+- Also produces (added during execution, see Task 7's fix round): `toNavigableUrl(value: string): string | null` — turns a value typed into the bar into a URL worth navigating to, assuming `https://` when no scheme is present, refusing `javascript:`, `data:` and `vbscript:`, and refusing anything `new URL` cannot parse.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -691,6 +698,24 @@ describe('normalizeHost', () => {
   it('rejects input with inner spaces', () => {
     expect(normalizeHost('exa mple.com')).toBeNull();
   });
+
+  it('keeps a bracketed IPv6 literal intact', () => {
+    expect(normalizeHost('[2001:db8::1]')).toBe('[2001:db8::1]');
+    expect(normalizeHost('[::1]')).toBe('[::1]');
+  });
+
+  it('strips scheme, port and path around an IPv6 literal', () => {
+    expect(normalizeHost('http://[2001:db8::1]:8080/path?q=1')).toBe('[2001:db8::1]');
+  });
+
+  it('returns null for a scheme that carries no host', () => {
+    expect(normalizeHost('about:blank')).toBeNull();
+    expect(normalizeHost('mailto:someone@example.com')).toBeNull();
+  });
+
+  it('still reads a bare host:port as a host', () => {
+    expect(normalizeHost('example.com:8080/path')).toBe('example.com');
+  });
 });
 
 describe('isDenied', () => {
@@ -723,6 +748,15 @@ describe('isDenied', () => {
   it('ignores unnormalizable entries', () => {
     expect(isDenied('example.com', ['', '  ', 'example.com'])).toBe(true);
   });
+
+  it('does not confuse distinct IPv6 hosts', () => {
+    expect(isDenied('[2001:db8::1]', ['[2001:db8::9999]'])).toBe(false);
+    expect(isDenied('[::2]', ['[::1]'])).toBe(false);
+  });
+
+  it('matches an IPv6 host against its own entry', () => {
+    expect(isDenied('[2001:db8::1]', ['[2001:db8::1]'])).toBe(true);
+  });
 });
 ```
 
@@ -744,18 +778,28 @@ Expected: FAIL — cannot resolve `./site-rules`.
  * Reduce user input (a bare host, a pasted URL, stray whitespace) to a
  * storable hostname, or null when it cannot be one.
  */
+// A scheme with no "//" (about:blank, mailto:) carries no host at all. The
+// lookahead keeps "localhost:3000" out of this branch: a bare port is digits.
+const SCHEME_WITHOUT_AUTHORITY = /^[a-z][a-z0-9+.-]*:(?!\d+(?:[/?#]|$))/;
+// A bracketed IPv6 literal, which is what location.hostname reports for one.
+const IPV6_LITERAL = /^\[[0-9a-f:.]+\]/;
+
 export function normalizeHost(input: string): string | null {
   let value = input.trim().toLowerCase();
   if (!value) return null;
 
   const schemeEnd = value.indexOf('://');
   if (schemeEnd !== -1) value = value.slice(schemeEnd + 3);
+  else if (SCHEME_WITHOUT_AUTHORITY.test(value)) return null;
 
   // Everything from the first path, query or fragment separator is not host.
   value = value.split(/[/?#]/, 1)[0];
-  // Credentials, then port.
-  value = value.slice(value.lastIndexOf('@') + 1).split(':', 1)[0];
-  value = value.replace(/^\.+/, '').replace(/\.+$/, '');
+  // Credentials, then port — but an IPv6 literal is colons all the way down,
+  // so it keeps its brackets and only a trailing :port is cut.
+  value = value.slice(value.lastIndexOf('@') + 1);
+  const ipv6 = IPV6_LITERAL.exec(value);
+  if (ipv6) value = ipv6[0];
+  else value = value.split(':', 1)[0].replace(/^\.+/, '').replace(/\.+$/, '');
 
   if (!value || /\s/.test(value)) return null;
   return value;
@@ -934,6 +978,15 @@ describe('renderBar', () => {
     const { close, calls } = setup();
     close.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(calls.hide).toBe(1);
+  });
+
+  it('cancels a pending copy when the bar is closed', () => {
+    const { text, close, calls } = setup();
+    text.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    close.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    vi.advanceTimersByTime(250);
+    expect(calls.hide).toBe(1);
+    expect(calls.copy).toBe(0);
   });
 
   it('shows a transient hint', () => {
@@ -1142,7 +1195,13 @@ export function renderBar(callbacks: BarCallbacks): BarHandle {
 
   input.addEventListener('blur', stopEditing);
 
-  close.addEventListener('click', () => callbacks.onHide());
+  close.addEventListener('click', () => {
+    // Dismissing the bar cancels anything it still had scheduled: a pending
+    // copy must not reach the clipboard after the user closed the bar.
+    clearTimeout(clickTimer);
+    clearTimeout(hintTimer);
+    callbacks.onHide();
+  });
 
   return {
     element: bar,
@@ -1598,7 +1657,7 @@ Replace `src/content/main.ts` in full:
 
 import type { Settings } from '../core/settings';
 import { isDenied } from '../core/site-rules';
-import { formatUrl } from '../core/url-format';
+import { formatUrl, toNavigableUrl } from '../core/url-format';
 import { createSettingsStore } from '../integration/settings-storage';
 import { BAR_HEIGHT, renderBar, type BarHandle } from '../ui/bar';
 import { STYLES } from '../ui/styles';
@@ -1633,15 +1692,18 @@ async function copyUrl(): Promise<void> {
 }
 
 function navigate(value: string): void {
-  // Navigate to what was typed, with one normalization: a missing scheme.
-  const target = /^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value}`;
+  const target = toNavigableUrl(value);
+  if (!target) {
+    bar?.showHint('Invalid address');
+    return;
+  }
   location.assign(target);
 }
 
 function mount(settings: Settings): void {
   if (host) return;
 
-  bar = renderBar({
+  const handle = renderBar({
     onCopy: () => void copyUrl(),
     onNavigate: navigate,
     onHide: () => {
@@ -1649,16 +1711,20 @@ function mount(settings: Settings): void {
       unmount();
     },
   });
-  bar.setTheme(resolveTheme(settings.theme));
+  handle.setTheme(resolveTheme(settings.theme));
 
-  host = document.createElement('div');
-  host.id = HOST_ID;
-  const shadow = host.attachShadow({ mode: 'open' });
+  const element = document.createElement('div');
+  element.id = HOST_ID;
+  const shadow = element.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = STYLES;
-  shadow.append(style, bar.element);
+  shadow.append(style, handle.element);
+  document.documentElement.append(element);
 
-  document.documentElement.append(host);
+  // Publish state only once the DOM work has succeeded: a failure above must
+  // leave nothing wedged behind, so a later settings change can retry.
+  host = element;
+  bar = handle;
   // Shift only after a successful mount, so a failure leaves the page intact.
   shift.apply(BAR_HEIGHT);
 
@@ -1682,23 +1748,26 @@ function applies(settings: Settings): boolean {
 }
 
 function sync(settings: Settings): void {
-  if (applies(settings)) {
-    mount(settings);
-    bar?.setTheme(resolveTheme(settings.theme));
-  } else {
+  try {
+    if (applies(settings)) {
+      mount(settings);
+      bar?.setTheme(resolveTheme(settings.theme));
+    } else {
+      unmount();
+    }
+  } catch (err) {
+    // Never leave the page half-modified, and never wedge the module: unmount
+    // clears the state so a later settings change can try again.
     unmount();
+    console.error('[full-address-bar]', err);
   }
 }
 
 async function run(): Promise<void> {
-  try {
-    sync(await store.load());
-    store.subscribe(sync);
-  } catch (err) {
-    // Never leave the page half-modified if anything unexpected fails.
-    unmount();
-    console.error('[full-address-bar]', err);
-  }
+  // Subscribe before the first mount: if that mount fails, a later settings
+  // change must still be able to bring the bar back.
+  store.subscribe(sync);
+  sync(await store.load());
 }
 
 void run();
@@ -1749,6 +1818,10 @@ Deliverable: a working popup with the global toggle, theme selector, "disable on
 **Files:**
 - Modify: `src/popup/popup.html` (replace the Task 1 placeholder)
 - Modify: `src/popup/popup.ts` (replace the Task 1 placeholder)
+- Create (added during execution): `src/popup/deny-list.ts` + `src/popup/deny-list.test.ts` — the
+  deny-list writes, extracted so they can be tested. Each write re-reads settings through
+  `store.load()` first; computing from the snapshot captured at render time meant two rapid
+  removals silently resurrected the first host.
 
 **Interfaces:**
 - Consumes: `createSettingsStore` (Task 7), `normalizeHost` (Task 4), `Theme` (Task 3).
@@ -1883,6 +1956,7 @@ Deliverable: a working popup with the global toggle, theme selector, "disable on
 // on its own, so nothing is messaged directly.
 
 import { normalizeHost } from '../core/site-rules';
+import { addDeniedHost, removeDeniedHost } from './deny-list';
 import type { Settings, Theme } from '../core/settings';
 import { createSettingsStore } from '../integration/settings-storage';
 
@@ -1907,9 +1981,7 @@ function renderDenied(settings: Settings): void {
       remove.textContent = '✕';
       remove.title = `Enable the bar on ${host}`;
       remove.addEventListener('click', () => {
-        void store
-          .save({ deniedHosts: settings.deniedHosts.filter((h) => h !== host) })
-          .then(refresh);
+        void removeDeniedHost(store, host).then(refresh);
       });
 
       const name = document.createElement('span');
@@ -1937,7 +2009,7 @@ async function refresh(): Promise<void> {
   if (host && !alreadyDenied) {
     denySite.textContent = `Disable on ${host}`;
     denySite.onclick = () => {
-      void store.save({ deniedHosts: [...settings.deniedHosts, host] }).then(refresh);
+      void addDeniedHost(store, host).then(refresh);
     };
   }
 }
