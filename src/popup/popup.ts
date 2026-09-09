@@ -3,8 +3,9 @@
 // All state lives in extension storage; the content script reacts to changes
 // on its own, so nothing is messaged directly.
 
-import { normalizeHost } from '../core/site-rules';
+import { isDenied, normalizeHost } from '../core/site-rules';
 import type { Settings, Theme } from '../core/settings';
+import { api } from '../integration/browser-api';
 import { createSettingsStore } from '../integration/settings-storage';
 import { addDeniedHost, removeDeniedHost } from './deny-list';
 
@@ -17,8 +18,15 @@ const deniedList = document.getElementById('denied') as HTMLUListElement;
 const empty = document.getElementById('empty') as HTMLParagraphElement;
 
 async function currentHost(): Promise<string | null> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  return tab?.url ? normalizeHost(tab.url) : null;
+  // Anything missing here (no extension API, a tab with no readable URL) means
+  // there is no site to offer, not an error worth breaking the popup over.
+  try {
+    const tabs = await api?.tabs?.query({ active: true, currentWindow: true });
+    const url = tabs?.[0]?.url;
+    return url ? normalizeHost(url) : null;
+  } catch {
+    return null;
+  }
 }
 
 function renderDenied(settings: Settings): void {
@@ -52,7 +60,9 @@ async function refresh(): Promise<void> {
   renderDenied(settings);
 
   const host = await currentHost();
-  const alreadyDenied = host !== null && settings.deniedHosts.includes(host);
+  // The same predicate the content script uses, so the popup never offers to
+  // deny a host already covered by a parent-domain entry.
+  const alreadyDenied = host !== null && isDenied(host, settings.deniedHosts);
   denySite.hidden = host === null || alreadyDenied;
   if (host && !alreadyDenied) {
     denySite.textContent = `Disable on ${host}`;
