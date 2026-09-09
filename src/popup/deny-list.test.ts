@@ -15,8 +15,17 @@ function fakeStorageArea() {
   };
 }
 
+// `integration/browser-api` resolves the namespace when it is first evaluated,
+// which happens on import — before any beforeEach — so the global has to exist
+// by then; each test then gets fresh storage swapped into it.
+const chrome = vi.hoisted(() => {
+  const stub = { storage: {} };
+  (globalThis as unknown as { chrome: typeof stub }).chrome = stub;
+  return stub;
+});
+
 beforeEach(() => {
-  vi.stubGlobal('chrome', { storage: fakeStorageArea() });
+  chrome.storage = fakeStorageArea();
 });
 
 describe('deny-list writes', () => {

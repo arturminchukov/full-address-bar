@@ -4,6 +4,7 @@
 // unavailable (e.g. running the bar on a plain page during development).
 
 import { parseSettings, type Settings } from '../core/settings';
+import { api } from './browser-api';
 
 export const SETTINGS_KEY = 'fab-settings';
 
@@ -15,7 +16,7 @@ export interface SettingsStore {
 }
 
 export function createSettingsStore(): SettingsStore {
-  const area = globalThis.chrome?.storage?.local;
+  const area = api?.storage?.local;
 
   async function load(): Promise<Settings> {
     if (!area) return parseSettings(undefined);
@@ -38,7 +39,7 @@ export function createSettingsStore(): SettingsStore {
     },
 
     subscribe(fn) {
-      const onChanged = globalThis.chrome?.storage?.onChanged;
+      const onChanged = api?.storage?.onChanged;
       if (!onChanged) return () => undefined;
       const listener = (
         changes: Record<string, chrome.storage.StorageChange>,
