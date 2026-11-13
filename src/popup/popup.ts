@@ -8,8 +8,10 @@ import type { Settings, Theme } from '../core/settings';
 import { api } from '../integration/browser-api';
 import { createSettingsStore } from '../integration/settings-storage';
 import { addDeniedHost, removeDeniedHost } from './deny-list';
+import { bindShortcutSettings } from './shortcuts';
 
 const store = createSettingsStore();
+const shortcutSettings = bindShortcutSettings(document, store);
 
 const toggle = document.getElementById('toggle') as HTMLButtonElement;
 const themeSelect = document.getElementById('theme') as HTMLSelectElement;
@@ -57,6 +59,7 @@ async function refresh(): Promise<void> {
   toggle.dataset.on = String(settings.enabled);
   toggle.textContent = settings.enabled ? 'Turn off everywhere' : 'Turn on';
   themeSelect.value = settings.theme;
+  shortcutSettings.render(settings.shortcuts);
   renderDenied(settings);
 
   const host = await currentHost();

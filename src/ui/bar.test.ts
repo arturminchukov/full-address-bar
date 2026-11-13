@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BAR_HEIGHT, renderBar, type BarCallbacks } from "./bar";
 import { STYLES } from "./styles";
+import { parseShortcuts, type Shortcuts } from "../core/shortcuts";
 
 function setup(overrides: Partial<BarCallbacks> = {}) {
   const calls = {
@@ -12,7 +13,9 @@ function setup(overrides: Partial<BarCallbacks> = {}) {
     position: [] as string[],
     autoHide: [] as boolean[],
     collapse: 0,
+    shortcuts: [] as Shortcuts[],
   };
+  let savedShortcuts = parseShortcuts(undefined);
   const bar = renderBar({
     onCopy: () => {
       calls.copy += 1;
@@ -34,6 +37,11 @@ function setup(overrides: Partial<BarCallbacks> = {}) {
     },
     onCollapse: () => {
       calls.collapse += 1;
+    },
+    onLoadShortcuts: async () => savedShortcuts,
+    onSetShortcuts: async (shortcuts) => {
+      savedShortcuts = shortcuts;
+      calls.shortcuts.push(shortcuts);
     },
     ...overrides,
   });
@@ -79,6 +87,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.useRealTimers();
   document.body.replaceChildren();
 });
@@ -92,6 +101,46 @@ describe("BAR_HEIGHT", () => {
 });
 
 describe("renderBar", () => {
+  it("styles only Mac modifier symbols separately from shortcut text and letters", () => {
+    vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+    const { bar } = setup();
+    const next = parseShortcuts(undefined);
+    next.toggle.ctrlKey = true;
+    next.toggle.metaKey = true;
+    bar.setShortcuts(next);
+    const hints = bar.element.querySelector(".fab-shortcuts")!;
+    expect(hints.textContent).toBe("Show/hide ⌃⌥⌘LEdit ⌥⇧L");
+    const symbols = [...hints.querySelectorAll(".fab-shortcut-symbol")];
+    expect(symbols.map((node) => node.textContent)).toEqual(["⌃⌥⌘", "⌥⇧"]);
+    expect(symbols.every((node) => !node.textContent?.includes("L"))).toBe(true);
+  });
+
+  it("does not enlarge textual modifier names on non-Mac platforms", () => {
+    vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+    const { bar } = setup();
+    bar.setShortcuts(parseShortcuts(undefined));
+    const hints = bar.element.querySelector(".fab-shortcuts")!;
+    expect(hints.textContent).toBe("Show/hide Alt+LEdit Alt+Shift+L");
+    expect(hints.querySelector(".fab-shortcut-symbol")).toBeNull();
+  });
+
+  it("shows live shortcut labels inline with the bar controls", () => {
+    const { bar } = setup();
+    bar.setShortcuts(parseShortcuts(undefined));
+    const hints = bar.element.querySelector(".fab-shortcuts")!;
+    expect(hints.textContent).toContain("Show/hide");
+    expect(hints.textContent).toContain("Edit");
+    expect(hints.textContent).toContain("L");
+    expect(hints.parentElement).toBe(bar.element);
+    const next = parseShortcuts(undefined);
+    next.toggle.code = "KeyK";
+    next.edit.code = "KeyJ";
+    bar.setShortcuts(next);
+    expect(hints.textContent).toContain("K");
+    expect(hints.textContent).toContain("J");
+    expect(hints.textContent).not.toContain("L");
+  });
+
   it("shows the decoded URL and hides the input initially", () => {
     const { text, input } = setup();
     expect(text.textContent).toBe("https://example.com/путь");
@@ -315,6 +364,56 @@ describe("interaction lifetime", () => {
 });
 
 describe("bar menu", () => {
+  it("records shortcuts directly in the menu and rejects conflicts", async () => {
+    const { bar, menuButton, menu, click, calls } = setup();
+    click(menuButton);
+    const field = menu.querySelector<HTMLInputElement>("#shortcut-toggle");
+    expect(field).not.toBeNull();
+    field!.focus();
+    field!.dispatchEvent(new KeyboardEvent("keydown", {
+      key: "k", code: "KeyK", altKey: true, bubbles: true,
+    }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls.shortcuts).toHaveLength(1);
+    expect(calls.shortcuts[0].toggle.code).toBe("KeyK");
+    expect(menu.hidden).toBe(false);
+    expect(bar.isRecordingShortcut()).toBe(false);
+    expect(field!.value).toContain("K");
+
+    const edit = menu.querySelector<HTMLInputElement>("#shortcut-edit")!;
+    edit.focus();
+    expect(bar.isRecordingShortcut()).toBe(true);
+    edit.dispatchEvent(new KeyboardEvent("keydown", {
+      key: "k", code: "KeyK", altKey: true, bubbles: true,
+    }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls.shortcuts).toHaveLength(1);
+    expect(menu.querySelector("#shortcut-status")!.textContent).toContain("already assigned");
+  });
+
+  it("resets shortcuts from the menu and cancels recording when dismissed", async () => {
+    const { bar, menuButton, menu, click, calls } = setup();
+    click(menuButton);
+    menu.querySelector<HTMLButtonElement>("#shortcut-reset")!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls.shortcuts[0]).toEqual(parseShortcuts(undefined));
+    menu.querySelector<HTMLInputElement>("#shortcut-toggle")!.focus();
+    expect(bar.isRecordingShortcut()).toBe(true);
+    bar.dismiss();
+    expect(bar.isRecordingShortcut()).toBe(false);
+    expect(menu.hidden).toBe(true);
+  });
+
+  it("shows save failures within the menu", async () => {
+    const { menuButton, menu, click } = setup({
+      onSetShortcuts: async () => { throw new Error("storage unavailable"); },
+    });
+    click(menuButton);
+    menu.querySelector<HTMLButtonElement>("#shortcut-reset")!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(menu.querySelector("#shortcut-status")!.textContent).toContain("Could not save");
+  });
+
   it("starts closed and opens on the menu button", () => {
     const { menuButton, menu, click, bar } = setup();
     expect(menu.hidden).toBe(true);

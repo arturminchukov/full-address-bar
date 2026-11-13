@@ -71,6 +71,7 @@ describe('createSettingsStore', () => {
     await store.save({ enabled: false });
 
     expect(storage.data[key]).toEqual({
+      ...DEFAULT_SETTINGS,
       enabled: false,
       theme: 'dark',
       position: 'top',
@@ -78,6 +79,7 @@ describe('createSettingsStore', () => {
       deniedHosts: ['a.com'],
     });
     expect(await store.load()).toEqual({
+      ...DEFAULT_SETTINGS,
       enabled: false,
       theme: 'dark',
       position: 'top',

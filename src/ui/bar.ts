@@ -2,7 +2,9 @@
 // the page, or navigation: every effect goes out through a callback.
 
 import type { Position, Theme } from "../core/settings";
+import { formatShortcut, type Shortcuts } from "../core/shortcuts";
 import { el } from "./dom";
+import { renderShortcutSettings } from "./shortcut-settings";
 
 /** Bar height in px, kept in sync with the stylesheet. */
 export const BAR_HEIGHT = 28;
@@ -24,6 +26,8 @@ export interface BarCallbacks {
   onSetPosition(position: Position): void;
   onSetAutoHide(autoHide: boolean): void;
   onCollapse(): void;
+  onLoadShortcuts(): Promise<Shortcuts>;
+  onSetShortcuts(shortcuts: Shortcuts): Promise<void>;
   /** Add this site to the deny-list for good. */
   onDenySite(): void;
 }
@@ -36,6 +40,8 @@ export interface BarHandle {
   setTheme(theme: Exclude<Theme, "auto">): void;
   setPosition(position: Position): void;
   setAutoHide(autoHide: boolean): void;
+  setShortcuts(shortcuts: Shortcuts): void;
+  isRecordingShortcut(): boolean;
   /** Remove the bar from rendering, or bring it back. */
   setHidden(hidden: boolean): void;
   /** True while the menu is open, so callers can hold the bar visible. */
@@ -62,6 +68,7 @@ export function renderBar(callbacks: BarCallbacks): BarHandle {
     hidden: true,
   }) as HTMLInputElement;
   const hint = el("span", { class: "fab-hint", hidden: true });
+  const shortcuts = el("span", { class: "fab-shortcuts", hidden: true });
   const collapseButton = el("button", {
     class: "fab-collapse-btn",
     type: "button",
@@ -78,11 +85,38 @@ export function renderBar(callbacks: BarCallbacks): BarHandle {
     text: "⋯",
   }) as HTMLButtonElement;
   const menu = el("div", { class: "fab-menu", role: "menu", hidden: true });
+  const mac = /Mac|iPhone|iPad/.test(navigator.platform);
+  const shortcutSettings = renderShortcutSettings({
+    load: () => callbacks.onLoadShortcuts(),
+    save: async (next) => {
+      await callbacks.onSetShortcuts(next);
+      setShortcuts(next);
+    },
+  }, mac);
+
+  function setShortcuts(next: Shortcuts): void {
+    const toggle = formatShortcut(next.toggle, mac);
+    const edit = formatShortcut(next.edit, mac);
+    const label = (action: string, shortcut: string) => el("span", {}, [
+      `${action} `,
+      ...shortcut.split(/([⌥⇧⌃⌘]+)/).map((part) =>
+        /^[⌥⇧⌃⌘]+$/.test(part)
+          ? el("span", { class: "fab-shortcut-symbol", text: part })
+          : part,
+      ),
+    ]);
+    shortcuts.replaceChildren(label("Show/hide", toggle), label("Edit", edit));
+    shortcuts.hidden = false;
+    shortcuts.title = `Show/hide ${toggle} · Edit ${edit}`;
+    collapseButton.title = `Collapse bar (${toggle})`;
+    shortcutSettings.render(next);
+  }
 
   const bar = el("div", { class: "fab-bar", role: "toolbar" }, [
     text,
     input,
     hint,
+    shortcuts,
     collapseButton,
     menuButton,
     menu,
@@ -140,9 +174,21 @@ export function renderBar(callbacks: BarCallbacks): BarHandle {
   };
 
   const closeMenu = () => {
+    shortcutSettings.cancel();
     menu.hidden = true;
     menuButton.setAttribute("aria-expanded", "false");
   };
+
+  // Dynamic choices can be rebuilt without detaching the focused recorder.
+  const menuOptions = el("div");
+  const menuActions = el("div");
+  menu.append(
+    menuOptions,
+    el("div", { class: "fab-menu-sep" }),
+    shortcutSettings.element,
+    el("div", { class: "fab-menu-sep" }),
+    menuActions,
+  );
 
   const buildMenu = () => {
     const item = (spec: MenuItemSpec): HTMLElement => {
@@ -165,7 +211,7 @@ export function renderBar(callbacks: BarCallbacks): BarHandle {
       return node;
     };
 
-    menu.replaceChildren(
+    menuOptions.replaceChildren(
       el("div", { class: "fab-menu-group", text: "Position" }),
       item({
         label: "Top of the page",
@@ -183,7 +229,8 @@ export function renderBar(callbacks: BarCallbacks): BarHandle {
         checked: !autoHide,
         onSelect: () => callbacks.onSetAutoHide(!autoHide),
       }),
-      el("div", { class: "fab-menu-sep" }),
+    );
+    menuActions.replaceChildren(
       item({ label: "Hide on this page", onSelect: () => callbacks.onHide() }),
       item({
         label: "Turn off on this site",
@@ -279,16 +326,20 @@ export function renderBar(callbacks: BarCallbacks): BarHandle {
         hint.hidden = true;
       }, HINT_MS);
     },
+    setShortcuts,
+    isRecordingShortcut: () => !menu.hidden && shortcutSettings.isRecording(),
     setTheme(theme) {
       bar.dataset.theme = theme;
     },
     setPosition(next) {
+      if (position === next) return;
       position = next;
       bar.dataset.position = next;
       collapseButton.textContent = next === "top" ? "⌃" : "⌄";
       if (!menu.hidden) buildMenu();
     },
     setAutoHide(next) {
+      if (autoHide === next) return;
       autoHide = next;
       collapseButton.hidden = !next;
       if (!menu.hidden) buildMenu();

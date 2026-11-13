@@ -2,7 +2,8 @@
 // with side effects: it reads settings, mounts the bar into a Shadow DOM host,
 // keeps the bar in sync with navigation and settings.
 
-import type { Position, Settings } from "../core/settings";
+import { DEFAULT_SETTINGS, type Position, type Settings } from "../core/settings";
+import { matchesShortcut } from "../core/shortcuts";
 import { isDenied, normalizeHost } from "../core/site-rules";
 import { formatUrl, toNavigableUrl } from "../core/url-format";
 import { createSettingsStore } from "../integration/settings-storage";
@@ -16,6 +17,7 @@ const HOST_ID = "full-address-bar-host";
 
 const store = createSettingsStore();
 let autoHide = true;
+let shortcuts = DEFAULT_SETTINGS.shortcuts;
 
 let host: HTMLElement | null = null;
 let bar: BarHandle | null = null;
@@ -23,10 +25,13 @@ let stopWatching: (() => void) | null = null;
 // Set from the menu: the bar stays down for this page load only.
 let hiddenForThisPage = false;
 
-// Keep the bar visible during pointer, menu and keyboard interaction.
+// Only page scrolling hides a revealed bar; scrolling the URL editor does not.
 const edgeReveal = createEdgeReveal(window, {
-  setHidden: (hidden) => bar?.setHidden(hidden),
-  isPinned: () => bar?.isInteracting() ?? false,
+  setHidden: (hidden) => {
+    if (hidden) bar?.dismiss();
+    bar?.setHidden(hidden);
+  },
+  ignoreScroll: (event) => host !== null && event.composedPath().includes(host),
 });
 
 function currentUrl(): void {
@@ -83,9 +88,12 @@ function applyLayout(settings: Settings): void {
   bar.setPosition(settings.position);
   bar.setAutoHide(settings.autoHide);
 
+  const wasAutoHide = autoHide;
   autoHide = settings.autoHide;
   if (autoHide) edgeReveal.start(settings.position);
-  else edgeReveal.stop();
+  else if (wasAutoHide) edgeReveal.stop();
+  shortcuts = settings.shortcuts;
+  bar.setShortcuts(shortcuts);
 }
 
 function denyCurrentSite(): void {
@@ -113,6 +121,8 @@ function mount(settings: Settings): void {
       bar?.dismiss();
       edgeReveal.collapse();
     },
+    onLoadShortcuts: async () => (await store.load()).shortcuts,
+    onSetShortcuts: (shortcuts) => store.save({ shortcuts }),
     onDenySite: denyCurrentSite,
   });
   handle.setTheme(resolveTheme(settings.theme));
@@ -146,13 +156,20 @@ function mount(settings: Settings): void {
 }
 
 function onKeyDown(event: KeyboardEvent): void {
-  if (!bar) return;
-  if (event.code === "KeyL" && event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey) {
+  if (!bar || bar.isRecordingShortcut()) return;
+  const toggle = matchesShortcut(event, shortcuts.toggle);
+  const edit = matchesShortcut(event, shortcuts.edit);
+  if (toggle || edit) {
     event.preventDefault();
     event.stopPropagation();
     if (event.repeat) return;
-    if (autoHide) edgeReveal.reveal();
-    bar.edit();
+    if (toggle) {
+      if (edgeReveal.isHidden()) edgeReveal.reveal();
+      else edgeReveal.collapse();
+    } else {
+      edgeReveal.reveal();
+      bar.edit();
+    }
   } else if (event.key === "Escape" && event.composedPath().includes(host as EventTarget)) {
     event.preventDefault();
     event.stopPropagation();

@@ -13,6 +13,7 @@ describe('parseSettings', () => {
 
   it('fills missing fields from the defaults', () => {
     expect(parseSettings({ enabled: false })).toEqual({
+      ...DEFAULT_SETTINGS,
       enabled: false,
       theme: 'auto',
       position: 'top',
@@ -59,6 +60,15 @@ describe('parseSettings', () => {
 
   it('replaces a non-array deniedHosts with an empty list', () => {
     expect(parseSettings({ deniedHosts: 'a.com' }).deniedHosts).toEqual([]);
+  });
+
+  it('loads shortcut defaults for older settings and validates stored shortcuts', () => {
+    expect(parseSettings({ enabled: true }).shortcuts).toEqual(DEFAULT_SETTINGS.shortcuts);
+    const shortcuts = {
+      toggle: { code: 'KeyK', altKey: true, ctrlKey: false, shiftKey: false, metaKey: false },
+    };
+    expect(parseSettings({ shortcuts }).shortcuts.toggle).toEqual(shortcuts.toggle);
+    expect(parseSettings({ shortcuts: 'broken' }).shortcuts).toEqual(DEFAULT_SETTINGS.shortcuts);
   });
 
   it('does not share the default array between results', () => {

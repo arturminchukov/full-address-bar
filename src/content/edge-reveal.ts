@@ -6,69 +6,54 @@ export interface EdgeReveal {
   start(position: Position): void;
   reveal(): void;
   collapse(): void;
+  isHidden(): boolean;
   stop(): void;
 }
 
 export interface EdgeRevealDeps {
   setHidden(hidden: boolean): void;
-  isPinned?(): boolean;
+  ignoreScroll?(event: Event): boolean;
 }
 
 export function createEdgeReveal(view: Window, deps: EdgeRevealDeps): EdgeReveal {
   let position: Position = "top";
   let hidden = false;
   let running = false;
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  let atEdge = false;
 
   const setHidden = (next: boolean) => {
     if (hidden === next) return;
     hidden = next;
     deps.setHidden(next);
   };
-  const scheduleHide = (delay = 450) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      timer = undefined;
-      if (deps.isPinned?.()) scheduleHide();
-      else setHidden(true);
-    }, delay);
-  };
-  const reveal = () => {
-    setHidden(false);
-    scheduleHide();
-  };
   const onPointerMove = (event: MouseEvent) => {
-    if (pointerAtEdge({ y: event.clientY, viewportHeight: view.innerHeight, position })) {
-      reveal();
-    } else if (!hidden && timer === undefined) {
-      scheduleHide();
-    }
+    const next = pointerAtEdge({ y: event.clientY, viewportHeight: view.innerHeight, position });
+    // A manual collapse must survive small movements while still at the edge.
+    if (next && !atEdge) setHidden(false);
+    atEdge = next;
   };
-  const onPointerLeave = () => {
-    if (!hidden) scheduleHide();
+  const onScroll = (event: Event) => {
+    if (!deps.ignoreScroll?.(event)) setHidden(true);
   };
 
   return {
     start(next) {
+      if (position !== next) atEdge = false;
       position = next;
       if (running) return;
       running = true;
       view.addEventListener("mousemove", onPointerMove, { passive: true });
-      view.addEventListener("blur", onPointerLeave);
-      scheduleHide(1800);
+      // Capture also sees scrolling in nested page containers.
+      view.addEventListener("scroll", onScroll, { passive: true, capture: true });
     },
-    reveal,
-    collapse() {
-      clearTimeout(timer);
-      timer = undefined;
-      setHidden(true);
-    },
+    reveal: () => setHidden(false),
+    collapse: () => setHidden(true),
+    isHidden: () => hidden,
     stop() {
-      clearTimeout(timer);
-      timer = undefined;
       view.removeEventListener("mousemove", onPointerMove);
-      view.removeEventListener("blur", onPointerLeave);
+      view.removeEventListener("scroll", onScroll, { capture: true });
       running = false;
+      atEdge = false;
       setHidden(false);
     },
   };

@@ -89,6 +89,32 @@
         font-weight: 400;
       }
       #empty { margin: 0; color: var(--muted); font-size: 12px; }
+      .shortcut-input {
+        box-sizing: border-box;
+        width: 148px;
+        padding: 5px 6px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text);
+        font: inherit;
+        text-align: center;
+        cursor: pointer;
+      }
+      .shortcut-input:focus { outline: 2px solid var(--accent); }
+      #shortcut-reset {
+        padding: 4px 8px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--text);
+        font-size: 12px;
+      }
+      .shortcut-help, #shortcut-status {
+        margin: 6px 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      #shortcut-status:empty { display: none; }
     </style>
   </head>
   <body>
@@ -102,6 +128,21 @@
         <option value="dark">Dark</option>
       </select>
     </div>
+    <h2>Keyboard shortcuts</h2>
+    <div class="row">
+      <label for="shortcut-toggle">Show / hide bar</label>
+      <input id="shortcut-toggle" class="shortcut-input" type="text" readonly
+        placeholder="Press shortcut…" aria-describedby="shortcut-help shortcut-status" />
+    </div>
+    <div class="row">
+      <label for="shortcut-edit">Edit URL</label>
+      <input id="shortcut-edit" class="shortcut-input" type="text" readonly
+        placeholder="Press shortcut…" aria-describedby="shortcut-help shortcut-status" />
+    </div>
+    <button id="shortcut-reset" type="button">Reset shortcuts</button>
+    <p id="shortcut-help" class="shortcut-help">Click a field and press a new combination.
+      Works on web pages; browser and system shortcuts may take priority.</p>
+    <p id="shortcut-status" role="status" aria-live="polite"></p>
     <button id="deny-site" type="button" hidden>…</button>
     <h2>Disabled on</h2>
     <p id="empty">No sites yet.</p>

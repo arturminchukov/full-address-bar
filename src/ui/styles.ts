@@ -21,6 +21,7 @@ export const STYLES = /* css */ `
   right: 0;
   z-index: 2147483647;
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
   box-sizing: border-box;
@@ -55,6 +56,7 @@ export const STYLES = /* css */ `
 }
 .fab-url {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -74,6 +76,31 @@ export const STYLES = /* css */ `
 }
 .fab-hint {
   color: var(--text-muted);
+}
+.fab-shortcuts {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 40%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.fab-shortcut-symbol {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Symbol", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+}
+.fab-shortcuts > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fab-collapse-btn,
+.fab-menu-btn {
+  flex-shrink: 0;
 }
 .fab-collapse-btn,
 .fab-menu-btn {
@@ -95,7 +122,10 @@ export const STYLES = /* css */ `
 .fab-menu {
   position: absolute;
   right: 6px;
-  min-width: 210px;
+  width: min(300px, calc(100vw - 12px));
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  box-sizing: border-box;
   padding: 4px;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -136,6 +166,61 @@ export const STYLES = /* css */ `
 }
 .fab-menu-item .fab-menu-mark {
   color: var(--accent);
+}
+.fab-shortcut-settings {
+  padding: 2px 8px;
+}
+.fab-shortcut-settings .fab-menu-group {
+  padding-left: 0;
+}
+.fab-shortcut-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 6px 0;
+}
+.fab-shortcut-row label {
+  flex-shrink: 0;
+}
+.fab-shortcut-input {
+  box-sizing: border-box;
+  width: 130px;
+  min-width: 0;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  font: 14px/1.4 var(--font-mono);
+  text-align: center;
+  cursor: pointer;
+}
+.fab-shortcut-input:focus {
+  outline: 2px solid var(--accent);
+}
+.fab-shortcut-reset {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.fab-shortcut-reset:hover {
+  background: var(--hover);
+}
+.fab-shortcut-help,
+.fab-shortcut-settings #shortcut-status {
+  margin: 6px 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.fab-shortcut-settings #shortcut-status:empty {
+  display: none;
 }
 .fab-menu-sep {
   height: 1px;
