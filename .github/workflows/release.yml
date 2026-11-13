@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.ref_name }}
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+      CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+      CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+      CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+      CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Resolve version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Typecheck
+        run: yarn typecheck
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Test
+        run: yarn test
+
+      - name: Build
+        run: yarn build
+        env:
+          FAB_VERSION: ${{ env.VERSION }}
+
+      - name: Lint web extension (Firefox / AMO)
+        run: |
+          npx --yes web-ext@latest lint \
+            --source-dir dist-firefox \
+            --output text
+
+      - name: Package builds
+        run: yarn package
+        env:
+          FAB_VERSION: ${{ env.VERSION }}
+
+      - name: Package source (for AMO reviewers)
+        run: yarn package:source
+        env:
+          FAB_VERSION: ${{ env.VERSION }}
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release/full-address-bar-chrome-${{ env.VERSION }}.zip
+            release/full-address-bar-firefox-${{ env.VERSION }}.zip
+            release/full-address-bar-source-${{ env.VERSION }}.zip
+
+      - name: Publish to Firefox Add-ons (AMO)
+        if: ${{ env.AMO_JWT_ISSUER != '' && env.AMO_JWT_SECRET != '' }}
+        run: >
+          npx --yes web-ext@latest sign
+          --source-dir dist-firefox
+          --channel listed
+          --api-key "$AMO_JWT_ISSUER"
+          --api-secret "$AMO_JWT_SECRET"
+
+      - name: Publish to Chrome Web Store
+        if: >-
+          ${{ env.CWS_EXTENSION_ID != '' && env.CWS_CLIENT_ID != ''
+          && env.CWS_CLIENT_SECRET != '' && env.CWS_REFRESH_TOKEN != '' }}
+        uses: mnao305/chrome-extension-upload@v6.0.0
+        with:
+          file-path: release/full-address-bar-chrome-${{ env.VERSION }}.zip
+          extension-id: ${{ secrets.CWS_EXTENSION_ID }}
+          client-id: ${{ secrets.CWS_CLIENT_ID }}
+          client-secret: ${{ secrets.CWS_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.CWS_REFRESH_TOKEN }}
