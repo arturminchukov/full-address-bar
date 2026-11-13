@@ -212,6 +212,108 @@ describe("renderBar", () => {
   });
 });
 
+describe("interaction lifetime", () => {
+  it.each([false, true])("restores page focus after a pointer-opened menu (shadow: %s)", (shadow) => {
+    const pageInput = document.createElement("input");
+    document.body.append(pageInput);
+    const { bar, menuButton, click } = setup();
+    let root: Document | ShadowRoot = document;
+    if (shadow) {
+      const host = document.createElement("div");
+      document.body.append(host);
+      root = host.attachShadow({ mode: "open" });
+      root.append(bar.element);
+    }
+    pageInput.focus();
+    menuButton.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    menuButton.focus();
+    click(menuButton);
+    expect(root.activeElement).toBe(menuButton);
+    bar.dismiss();
+    expect(document.activeElement).toBe(pageInput);
+  });
+
+  it("opens the editor programmatically and restores page focus on dismiss", () => {
+    const pageInput = document.createElement("input");
+    document.body.append(pageInput);
+    pageInput.focus();
+    const { bar, input } = setup();
+    bar.edit();
+    expect(document.activeElement).toBe(input);
+    expect(bar.isInteracting()).toBe(true);
+    bar.dismiss();
+    expect(input.hidden).toBe(true);
+    expect(document.activeElement).toBe(pageInput);
+    expect(bar.isInteracting()).toBe(false);
+  });
+
+  it("restores page input focus inside nested open shadow roots on dismiss", () => {
+    const pageHost = document.createElement("page-host");
+    document.body.append(pageHost);
+    const outerRoot = pageHost.attachShadow({ mode: "open" });
+    const innerHost = document.createElement("inner-host");
+    outerRoot.append(innerHost);
+    const innerRoot = innerHost.attachShadow({ mode: "open" });
+    const pageInput = document.createElement("input");
+    innerRoot.append(pageInput);
+    const { bar, input } = setup();
+    pageInput.focus();
+    expect(document.activeElement).toBe(pageHost);
+    expect(outerRoot.activeElement).toBe(innerHost);
+    expect(innerRoot.activeElement).toBe(pageInput);
+
+    bar.edit();
+    expect(document.activeElement).toBe(input);
+    bar.dismiss();
+
+    expect(innerRoot.activeElement).toBe(pageInput);
+    expect(document.activeElement).toBe(pageHost);
+  });
+
+  it.each([false, true])("does not steal page focus on dismiss after editing (shadow: %s)", (shadow) => {
+    const first = document.createElement("input");
+    const second = document.createElement("input");
+    document.body.append(first, second);
+    const { bar } = setup();
+    if (shadow) {
+      const host = document.createElement("div");
+      document.body.append(host);
+      host.attachShadow({ mode: "open" }).append(bar.element);
+    }
+    first.focus();
+    bar.edit();
+    second.focus();
+    bar.dismiss();
+    expect(document.activeElement).toBe(second);
+  });
+
+  it("clears the old restoration target when focus leaves the toolbar", () => {
+    const first = document.createElement("input");
+    const second = document.createElement("input");
+    document.body.append(first, second);
+    const { bar, menuButton } = setup();
+    first.focus();
+    bar.edit();
+    second.focus();
+    second.blur();
+    menuButton.focus();
+    bar.dismiss();
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("holds the bar while the pointer or menu is inside", () => {
+    const { bar, menuButton, click } = setup();
+    bar.element.dispatchEvent(new Event("pointerenter"));
+    expect(bar.isInteracting()).toBe(true);
+    bar.element.dispatchEvent(new Event("pointerleave"));
+    expect(bar.isInteracting()).toBe(false);
+    click(menuButton);
+    expect(bar.isInteracting()).toBe(true);
+    bar.dismiss();
+    expect(bar.isInteracting()).toBe(false);
+  });
+});
+
 describe("bar menu", () => {
   it("starts closed and opens on the menu button", () => {
     const { menuButton, menu, click, bar } = setup();
@@ -258,12 +360,12 @@ describe("bar menu", () => {
   it("toggles auto-hide to the opposite of the current value", () => {
     const { bar, menuButton, menuItem, click, calls } = setup();
     click(menuButton);
-    click(menuItem("Hide while scrolling"));
+    click(menuItem("Always show (overlays page)"));
     expect(calls.autoHide).toEqual([true]);
 
     bar.setAutoHide(true);
     click(menuButton);
-    click(menuItem("Hide while scrolling"));
+    click(menuItem("Always show (overlays page)"));
     expect(calls.autoHide).toEqual([true, false]);
   });
 

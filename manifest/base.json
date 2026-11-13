@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Full Address Bar",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Shows the full current URL in a bar at the top of every page. Click to copy, double-click to edit.",
   "icons": {
     "16": "icons/icon-16.png",

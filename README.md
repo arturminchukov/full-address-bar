@@ -33,12 +33,9 @@ The `⋯` menu on the bar itself holds the two layout settings and the two ways
 to dismiss it:
 
 - **Position** — top or bottom of the page.
-- **Hide while scrolling** — the bar slides away as you scroll down and comes
-  back when you scroll up, reach the top of the page, or move the pointer to
-  its edge. Once revealed by the pointer, it stays visible until the next
-  downward scroll. See [Auto-hide](#auto-hide) below.
-- **Hide on this page** — dismisses the bar until the page is reloaded. Move
-  the pointer to its edge to bring it back.
+- **Always show (overlays page)** keeps the bar visible. It can cover site
+  controls at the selected edge; the page layout is never shifted.
+- **Hide on this page** dismisses the bar until the page is reloaded.
 - **Turn off on this site** — adds the host to the disabled list for good; the
   same thing the popup's button does.
 
@@ -55,9 +52,19 @@ Settings apply immediately to already-open tabs — no reload needed.
 
 ## Auto-hide
 
-With **Hide while scrolling** on, the bar floats over the page rather than
-pushing it down. That pairing is not a choice: a bar that both moved the page
-and slid away on scroll would make the content jump every time it moved.
+Auto-hide is enabled by default for new settings. Existing saved preferences
+are preserved. The bar previews for 1.8 seconds after mounting, then hides.
+Move the pointer within 4 pixels of its selected edge to reveal it. It stays
+visible while hovered, editing, focused, or showing its menu, and hides after
+a short idle delay of approximately 450 ms. Scrolling alone never reveals it.
+
+Press **Alt+Shift+L** on the page to reveal the editor with the raw URL selected.
+Press **Esc** inside the bar to dismiss editing/menu and restore the previous
+page focus. In auto-hide mode this also hides the bar; pinned mode stays visible.
+The shortcut works while the page has keyboard focus, not from browser chrome.
+
+Neither mode changes the page's margins, dimensions, or fixed/sticky elements.
+The visible bar temporarily overlays the selected edge.
 
 Bringing it back by pointing at the edge is deliberately not implemented with
 a strip of pixels at the edge of the window. Such a strip would be a hit area,
@@ -65,17 +72,16 @@ sitting exactly where sites like to put their own buttons, and it would
 swallow the clicks meant for them. Instead the bar watches pointer movement
 and reveals itself when the pointer comes within a few pixels of its edge —
 there is no element there to intercept anything, and while the bar is hidden
-it takes no pointer events at all. When auto-hide is enabled, the collapse
-button beside `⋯` hides it immediately; the next scroll resumes the normal
-scroll behavior.
+it has no rendered box or focusable controls. When auto-hide is enabled, the
+collapse button beside `⋯` hides it immediately; reveal it again at the edge
+or with the shortcut.
 
 ## Known limitation
 
-The bar is fixed to the top of the page, and the page itself is pushed down
-by setting `margin-top` on the document's root element to make room for it.
-A site that positions its own header with `position: fixed; top: 0` is not
-aware of this shift, so that header will render **underneath** the bar
-instead of below it.
+The visible bar overlays a narrow strip of page content. Auto-hide minimizes
+this obstruction; pinned mode deliberately keeps it visible. Ordinary browser
+extensions cannot add a horizontal toolbar outside the page or shrink its
+actual viewport. Browser-protected pages do not allow the content script.
 
 ## Permissions
 
@@ -103,6 +109,8 @@ yarn build        # -> dist-chrome/ and dist-firefox/
 ```sh
 yarn watch         # rebuild on change
 yarn test          # vitest
+yarn playwright install chromium firefox  # once, for browser tests
+yarn test:browser  # built content script, real engines, storage fixture
 yarn typecheck
 yarn lint
 yarn package        # -> release/full-address-bar-{chrome,firefox}-<version>.zip

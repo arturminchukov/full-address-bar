@@ -31,33 +31,33 @@ own extensions page. Chrome's limit is **132 characters**.
 
 ### Detailed description
 
-> **See the whole address, always.**
+> **Read, copy and edit the complete address.**
 >
 > Modern browsers hide the address: they drop the scheme, trim `www.`, cut the query string and
 > truncate long paths. Full Address Bar puts the complete URL back — in a fixed bar at the top of
-> every page, where it stays visible while you work.
+> every page. Reveal it at the edge or press Alt+Shift+L to edit.
 >
 > **What it does**
 >
 > • Shows the full current URL, percent-decoded so a Cyrillic or otherwise escaped path reads as
 >   text instead of `%D0%BF%D1%83%D1%82%D1%8C`.
 > • Follows navigation inside single-page apps, without a reload.
-> • Pushes the page down instead of covering it, so nothing is hidden behind the bar.
+> • Auto-hides by default without changing page layout or moving fixed site controls.
 >
 > **How you use it**
 >
 > • **Click** the URL to copy it. What lands on the clipboard is the raw address, not the decoded
 >   display form, so it pastes back as a working link.
 > • **Double-click** to edit it in place — Enter navigates, Esc or clicking away cancels.
-> • **⋯** opens the bar's own menu: put it at the top or the bottom of the page, have it hide while
->   you scroll, dismiss it for this page, or turn it off on the site for good.
+> • **Alt+Shift+L** reveals the editor. **Esc** dismisses it and restores page focus.
+> • **⋯** selects the edge, pins the bar, dismisses it for this page, or disables it for the site.
 >
 > **Settings**
 >
 > • A global on/off switch.
 > • Light, dark, or follow the system theme.
-> • Top or bottom of the page, and an optional hide-while-scrolling mode that brings the bar back
->   when you scroll up or move the pointer to its edge.
+> • Top or bottom of the page. Hover at the edge to reveal; move away to hide.
+> • Optional "Always show (overlays page)" mode keeps the bar visible.
 > • "Disable on this site", plus the list of sites you have disabled. A disabled entry covers that
 >   site's subdomains too.
 > • Changes apply to tabs that are already open — no reload needed.
@@ -72,14 +72,13 @@ own extensions page. Chrome's limit is **132 characters**.
 >
 > **Known limitation**
 >
-> The bar is fixed to the top of the viewport and the page is pushed down by a margin on the
-> document root. A site with its own sticky header pinned to `top: 0` will render underneath the
-> bar.
+> The visible bar overlays a narrow strip at the selected edge. Auto-hide limits the obstruction;
+> pinned mode keeps it visible. The extension does not change page margins or dimensions.
 >
 > **Privacy**
 >
 > Full Address Bar makes no network requests of any kind. It has no analytics and loads no remote
-> code. The only thing it stores is your three settings, held locally in the browser on your own
+> code. The only thing it stores is your settings, held locally in the browser on your own
 > device — see the privacy policy.
 
 ### Graphic assets
@@ -126,10 +125,10 @@ full width.
 
 | Permission | Justification |
 | --- | --- |
-| `storage` | Stores the user's three settings — the global on/off switch, the theme, and the list of sites the bar is disabled on — locally on the device. Nothing else is stored. |
+| `storage` | Stores the user's settings: global on/off, theme, position, auto-hide, and disabled sites — locally on the device. Nothing else is stored. |
 | `activeTab` | Lets the popup read the host of the tab whose toolbar icon was just clicked, so it can offer "Disable on this site". It is used for nothing else and grants no standing access. |
 | `clipboardWrite` | Copying the URL is the extension's primary action. On plain-HTTP pages the asynchronous clipboard API is unavailable, and this permission allows the `document.execCommand('copy')` fallback. |
-| Content script on `<all_urls>` | The bar's entire purpose is to be present on every page, so the content script must match every page. It runs in the top frame only (`all_frames: false`). It reads the page's URL and hostname, inserts its own UI element and a top margin on the document root, and does not read or modify the page's own content. |
+| Content script on `<all_urls>` | The bar's entire purpose is to be present on every page, so the content script must match every page. It runs in the top frame only (`all_frames: false`). It reads the page's URL and hostname, inserts its own UI element without changing page margins or dimensions, and does not read or modify the page's own content. |
 | Remote code | Not used. All logic is bundled in the package. |
 
 **Data usage:** certify that no user data is collected.
@@ -180,7 +179,7 @@ Paste the text of [`PRIVACY.md`](../PRIVACY.md).
 > `manifest/firefox.json` to produce the manifest; `src/popup/popup.html` and `icons/` are copied
 > verbatim. There is no background script.
 >
-> The add-on makes no network requests at all and collects nothing: the three settings live in
+> The add-on makes no network requests at all and collects nothing: the settings live in
 > `browser.storage.local` on the device.
 
 ---

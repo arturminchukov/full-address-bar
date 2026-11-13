@@ -13,12 +13,7 @@ export interface Settings {
   theme: Theme;
   /** Which edge of the viewport the bar is attached to. */
   position: Position;
-  /**
-   * Hide the bar while scrolling down, bring it back on scroll up or when the
-   * pointer reaches its edge. Implies the bar sits over the page instead of
-   * pushing it: a bar that both moved the page and hid itself would make the
-   * content jump on every scroll.
-   */
+  /** Hide when idle; reveal at the edge or with the editor shortcut. */
   autoHide: boolean;
   /** Hosts the bar is suppressed on, including their subdomains. */
   deniedHosts: string[];
@@ -28,7 +23,7 @@ export const DEFAULT_SETTINGS: Settings = {
   enabled: true,
   theme: 'auto',
   position: 'top',
-  autoHide: false,
+  autoHide: true,
   deniedHosts: [],
 };
 

@@ -29,7 +29,7 @@ export const STYLES = /* css */ `
   background: var(--bg);
   color: var(--text);
   font: 12px/1 var(--font-mono);
-  transition: transform 120ms ease-out;
+  pointer-events: auto;
 }
 .fab-bar[data-position="top"] {
   top: 0;
@@ -39,17 +39,11 @@ export const STYLES = /* css */ `
   bottom: 0;
   border-top: 1px solid var(--border);
 }
-/* Slid out of view rather than removed, so it can come back without a
-   relayout. Pointer events go off with it: a hidden bar must never intercept
-   a click meant for the page underneath. */
+/* Removing a fixed box does not reflow page content. Unlike translating it
+   below the viewport, this cannot enlarge the document's scrollable area.
+   Hidden controls also leave keyboard navigation and the accessibility tree. */
 .fab-bar[data-hidden="true"] {
-  pointer-events: none;
-}
-.fab-bar[data-hidden="true"][data-position="top"] {
-  transform: translateY(-100%);
-}
-.fab-bar[data-hidden="true"][data-position="bottom"] {
-  transform: translateY(100%);
+  display: none;
 }
 .fab-bar[data-theme="dark"] {
   --bg: #161b22;

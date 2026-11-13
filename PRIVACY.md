@@ -15,8 +15,8 @@ any server or third party.
 ## Data stored
 
 The only data the extension stores is your own settings: the global on/off
-switch, the theme (light/dark/auto), and the list of sites where the bar is
-disabled. These three fields are saved with the browser's local extension
+switch, the theme (light/dark/auto), the bar position, the auto-hide preference,
+and the list of sites where the bar is disabled. These fields use local extension
 storage (`chrome.storage.local`) on your device and are never transmitted
 anywhere.
 
@@ -33,8 +33,8 @@ anywhere.
   every page, which is exactly what a bar shown on every page requires. The
   script reads the page's URL (`location.href`) and its hostname (to apply
   your disabled-sites list), inserts its own bar element into the document,
-  and sets a top margin on the document's root element so the bar does not
-  cover the page. It does not read or modify the page's own content.
+  without changing the page's margins or dimensions. The visible bar overlays
+  the page; it auto-hides by default. It does not read or modify page content.
 
 ## Remote code
 

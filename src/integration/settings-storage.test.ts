@@ -74,14 +74,14 @@ describe('createSettingsStore', () => {
       enabled: false,
       theme: 'dark',
       position: 'top',
-      autoHide: false,
+      autoHide: true,
       deniedHosts: ['a.com'],
     });
     expect(await store.load()).toEqual({
       enabled: false,
       theme: 'dark',
       position: 'top',
-      autoHide: false,
+      autoHide: true,
       deniedHosts: ['a.com'],
     });
   });

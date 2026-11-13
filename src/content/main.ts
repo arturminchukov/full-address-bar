@@ -1,22 +1,21 @@
 // Content-script entry point. This is the only module in the content bundle
 // with side effects: it reads settings, mounts the bar into a Shadow DOM host,
-// shifts the page, and keeps both in sync with navigation and settings.
+// keeps the bar in sync with navigation and settings.
 
 import type { Position, Settings } from "../core/settings";
 import { isDenied, normalizeHost } from "../core/site-rules";
 import { formatUrl, toNavigableUrl } from "../core/url-format";
 import { createSettingsStore } from "../integration/settings-storage";
-import { BAR_HEIGHT, renderBar, type BarHandle } from "../ui/bar";
+import { renderBar, type BarHandle } from "../ui/bar";
 import { STYLES } from "../ui/styles";
 import { resolveTheme } from "../ui/theme";
 import { createEdgeReveal } from "./edge-reveal";
-import { createPageShift } from "./page-shift";
 import { watchUrl } from "./url-watch";
 
 const HOST_ID = "full-address-bar-host";
 
 const store = createSettingsStore();
-const shift = createPageShift(document);
+let autoHide = true;
 
 let host: HTMLElement | null = null;
 let bar: BarHandle | null = null;
@@ -24,10 +23,10 @@ let stopWatching: (() => void) | null = null;
 // Set from the menu: the bar stays down for this page load only.
 let hiddenForThisPage = false;
 
-// An auto-hiding bar must not slide away while its own menu is open.
+// Keep the bar visible during pointer, menu and keyboard interaction.
 const edgeReveal = createEdgeReveal(window, {
   setHidden: (hidden) => bar?.setHidden(hidden),
-  isPinned: () => bar?.isMenuOpen() ?? false,
+  isPinned: () => bar?.isInteracting() ?? false,
 });
 
 function currentUrl(): void {
@@ -78,23 +77,15 @@ function navigate(value: string): void {
   location.assign(target);
 }
 
-/**
- * Apply the layout half of the settings: which edge, and whether the bar
- * pushes the page or floats over it. Auto-hide implies floating — a bar that
- * both moved the page and slid away would make the content jump on scroll.
- */
+// The page layout is never modified, including in always-visible mode.
 function applyLayout(settings: Settings): void {
   if (!bar) return;
   bar.setPosition(settings.position);
   bar.setAutoHide(settings.autoHide);
 
-  if (settings.autoHide) {
-    shift.revert();
-    edgeReveal.start(settings.position);
-  } else {
-    edgeReveal.stop();
-    shift.apply(BAR_HEIGHT, settings.position);
-  }
+  autoHide = settings.autoHide;
+  if (autoHide) edgeReveal.start(settings.position);
+  else edgeReveal.stop();
 }
 
 function denyCurrentSite(): void {
@@ -118,7 +109,10 @@ function mount(settings: Settings): void {
     },
     onSetPosition: (position: Position) => void store.save({ position }),
     onSetAutoHide: (autoHide: boolean) => void store.save({ autoHide }),
-    onCollapse: () => edgeReveal.collapse(),
+    onCollapse: () => {
+      bar?.dismiss();
+      edgeReveal.collapse();
+    },
     onDenySite: denyCurrentSite,
   });
   handle.setTheme(resolveTheme(settings.theme));
@@ -128,6 +122,12 @@ function mount(settings: Settings): void {
   // A page rule setting transform/filter/contain/will-change on divs would
   // make this host a containing block and break the bar's position: fixed.
   element.style.setProperty("all", "initial", "important");
+  // Keep the host out of document flow without creating a containing block
+  // for its viewport-fixed child. Only the visible bar accepts pointer events.
+  for (const [property, value] of Object.entries({
+    position: "fixed", top: "0", left: "0", width: "0", height: "0",
+    "z-index": "2147483647", "pointer-events": "none",
+  })) element.style.setProperty(property, value, "important");
   const shadow = element.attachShadow({ mode: "open" });
   const style = document.createElement("style");
   style.textContent = STYLES;
@@ -138,19 +138,35 @@ function mount(settings: Settings): void {
   // leave nothing wedged behind, so a later settings change can retry.
   host = element;
   bar = handle;
-  // Touch the page's layout only after a successful mount, so a failure
-  // leaves it intact.
   applyLayout(settings);
+  document.addEventListener("keydown", onKeyDown, true);
 
   currentUrl();
   stopWatching = watchUrl(window, () => currentUrl());
+}
+
+function onKeyDown(event: KeyboardEvent): void {
+  if (!bar) return;
+  if (event.code === "KeyL" && event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.repeat) return;
+    if (autoHide) edgeReveal.reveal();
+    bar.edit();
+  } else if (event.key === "Escape" && event.composedPath().includes(host as EventTarget)) {
+    event.preventDefault();
+    event.stopPropagation();
+    bar.dismiss();
+    if (autoHide) edgeReveal.collapse();
+  }
 }
 
 function unmount(): void {
   stopWatching?.();
   stopWatching = null;
   edgeReveal.stop();
-  shift.revert();
+  document.removeEventListener("keydown", onKeyDown, true);
+  bar?.dismiss();
   host?.remove();
   host = null;
   bar = null;

@@ -4,7 +4,7 @@
 import type { Position, Theme } from "../core/settings";
 import { el } from "./dom";
 
-/** Bar height in px. The page shift must match this exactly. */
+/** Bar height in px, kept in sync with the stylesheet. */
 export const BAR_HEIGHT = 28;
 
 // A single click copies; a double click edits. The copy waits out this window
@@ -36,10 +36,13 @@ export interface BarHandle {
   setTheme(theme: Exclude<Theme, "auto">): void;
   setPosition(position: Position): void;
   setAutoHide(autoHide: boolean): void;
-  /** Slide the bar out of view, or bring it back. */
+  /** Remove the bar from rendering, or bring it back. */
   setHidden(hidden: boolean): void;
   /** True while the menu is open, so callers can hold the bar visible. */
   isMenuOpen(): boolean;
+  isInteracting(): boolean;
+  edit(): void;
+  dismiss(): void;
 }
 
 interface MenuItemSpec {
@@ -89,6 +92,8 @@ export function renderBar(callbacks: BarCallbacks): BarHandle {
 
   let raw = "";
   let editing = false;
+  let hovered = false;
+  let previousFocus: HTMLElement | null = null;
   let position: Position = "top";
   let autoHide = false;
   collapseButton.hidden = true;
@@ -101,7 +106,31 @@ export function renderBar(callbacks: BarCallbacks): BarHandle {
     text.hidden = false;
   };
 
+  const focusedControl = () => {
+    const active = (bar.getRootNode() as Document | ShadowRoot).activeElement;
+    return active instanceof HTMLElement && bar.contains(active) ? active : null;
+  };
+
+  const rememberPageFocus = () => {
+    let active = document.activeElement;
+    while (active?.shadowRoot?.activeElement) {
+      active = active.shadowRoot.activeElement;
+    }
+    if (!previousFocus && !focusedControl() && active instanceof HTMLElement) {
+      previousFocus = active;
+    }
+  };
+
+  // Pointer default actions move focus before click handlers run.
+  bar.addEventListener("pointerdown", rememberPageFocus, true);
+  bar.addEventListener("focusout", (event) => {
+    if (!(event.relatedTarget instanceof Node) || !bar.contains(event.relatedTarget)) {
+      previousFocus = null;
+    }
+  });
+
   const startEditing = () => {
+    if (!editing) rememberPageFocus();
     editing = true;
     input.value = raw;
     text.hidden = true;
@@ -150,8 +179,8 @@ export function renderBar(callbacks: BarCallbacks): BarHandle {
       }),
       el("div", { class: "fab-menu-sep" }),
       item({
-        label: "Hide while scrolling",
-        checked: autoHide,
+        label: "Always show (overlays page)",
+        checked: !autoHide,
         onSelect: () => callbacks.onSetAutoHide(!autoHide),
       }),
       el("div", { class: "fab-menu-sep" }),
@@ -213,8 +242,28 @@ export function renderBar(callbacks: BarCallbacks): BarHandle {
     if (!menu.contains(target) && target !== menuButton) closeMenu();
   });
 
+  bar.addEventListener("pointerenter", () => { hovered = true; });
+  bar.addEventListener("pointerleave", () => { hovered = false; });
+
   return {
     element: bar,
+    edit: startEditing,
+    dismiss() {
+      const active = focusedControl();
+      const restoreFocus = previousFocus;
+      clearTimeout(clickTimer);
+      stopEditing();
+      closeMenu();
+      hovered = false;
+      if (active) {
+        if (restoreFocus?.isConnected) restoreFocus.focus({ preventScroll: true });
+        focusedControl()?.blur();
+      }
+      previousFocus = null;
+    },
+    isInteracting() {
+      return hovered || editing || !menu.hidden || bar.matches(":focus-within");
+    },
     setUrl(display, rawUrl) {
       raw = rawUrl;
       text.textContent = display;

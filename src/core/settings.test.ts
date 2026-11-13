@@ -16,7 +16,7 @@ describe('parseSettings', () => {
       enabled: false,
       theme: 'auto',
       position: 'top',
-      autoHide: false,
+      autoHide: true,
       deniedHosts: [],
     });
   });
@@ -33,7 +33,7 @@ describe('parseSettings', () => {
 
   it('reads the auto-hide flag and rejects a wrongly typed one', () => {
     expect(parseSettings({ autoHide: true }).autoHide).toBe(true);
-    expect(parseSettings({ autoHide: 'yes' }).autoHide).toBe(false);
+    expect(parseSettings({ autoHide: 'yes' }).autoHide).toBe(true);
   });
 
   it('rejects a wrongly typed enabled flag', () => {
