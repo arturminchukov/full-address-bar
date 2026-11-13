@@ -1,0 +1,9 @@
+{
+  "summary": {
+    "en-US": "Shows the full current URL in a copyable, editable bar."
+  },
+  "categories": ["other"],
+  "version": {
+    "license": "MIT"
+  }
+}

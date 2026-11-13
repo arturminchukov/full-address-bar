@@ -3,6 +3,13 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, without the v prefix'
+        type: string
+        required: true
+        default: '0.1.1'
 
 permissions:
   contents: write
@@ -12,7 +19,7 @@ jobs:
     name: Build and publish release
     runs-on: ubuntu-latest
     env:
-      VERSION: ${{ github.ref_name }}
+      MANUAL_VERSION: ${{ inputs.version }}
       AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
       AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
       CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
@@ -33,8 +40,18 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Resolve version from tag
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - name: Resolve release version
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="$MANUAL_VERSION"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release version: expected X.Y.Z" >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Typecheck
         run: yarn typecheck
@@ -69,6 +86,7 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ env.VERSION }}
           generate_release_notes: true
           files: |
             release/full-address-bar-chrome-${{ env.VERSION }}.zip
@@ -81,6 +99,7 @@ jobs:
           npx --yes web-ext@latest sign
           --source-dir dist-firefox
           --channel listed
+          --amo-metadata .github/amo-metadata.json
           --api-key "$AMO_JWT_ISSUER"
           --api-secret "$AMO_JWT_SECRET"
 
